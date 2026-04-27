@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-papel text-[#2d221b] select-none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #ccb89b;
+    border-radius: 9999px;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-[2.5rem] border border-borde/40 bg-white shadow-xl;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-borde bg-white px-4 py-3 text-sm outline-none transition focus:border-caramelo focus:ring-4 focus:ring-caramelo/5;
+  }
+
+  /* Header Components (Based on Reference) */
+  .header-action-btn {
+    @apply w-16 h-16 flex flex-col items-center justify-center gap-1 rounded-2xl bg-papel border border-borde/60 transition-all hover:bg-cafe/5 hover:border-cafe/20 shadow-sm active:scale-90;
+  }
+
+  /* POS Components (Reference High Fidelity) */
+  .category-pill {
+    @apply px-8 py-3 rounded-xl bg-papel border border-borde/60 text-xs font-black text-cafe/50 transition-all whitespace-nowrap hover:bg-cafe/5;
+  }
+
+  .category-pill.active {
+    @apply bg-cafe text-white border-cafe shadow-lg shadow-cafe/20;
+  }
+
+  .product-card {
+    @apply p-4 bg-papel rounded-2xl border border-borde/60 shadow-sm transition-all hover:shadow-2xl hover:border-cafe/20 flex flex-col items-center text-center active:scale-95;
+  }
+
+  .pay-method-btn {
+    @apply flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white border border-borde/60 text-cafe/60 transition-all hover:bg-cafe/5 hover:border-cafe/20 active:scale-95 grayscale hover:grayscale-0;
+  }
+
+  .pay-method-btn.active {
+    @apply border-caramelo bg-caramelo/5 text-caramelo grayscale-0 ring-2 ring-caramelo/10;
+  }
+
+  .btn-pos-main {
+    @apply w-full py-5 rounded-2xl bg-cafe text-white text-xl font-black tracking-tight shadow-xl shadow-cafe/20 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:grayscale;
+  }
+
+  .btn-pos-main-square {
+    @apply w-full py-6 rounded-none bg-cafe text-white text-2xl font-black tracking-tight transition-all hover:brightness-110 disabled:opacity-50;
+  }
+
+  .btn-pos-pay-success {
+    @apply w-full py-6 rounded-none bg-verdeok text-white text-2xl font-black tracking-tight transition-all hover:brightness-110 disabled:opacity-50 disabled:grayscale;
+  }
+
+  /* Search Results Dropdown */
+  .search-results-dropdown {
+    @apply absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-borde/60 shadow-2xl z-[200] overflow-hidden max-h-96 overflow-y-auto;
+  }
+
+  .search-result-item {
+    @apply p-4 border-b border-borde/10 flex items-center justify-between hover:bg-cafe/5 cursor-pointer transition-colors bg-white;
+  }
+
+  .search-result-item .add-btn {
+    @apply w-10 h-10 rounded-xl bg-cafe text-white flex items-center justify-center text-xl font-bold transition-transform active:scale-90 hover:bg-caramelo;
+  }
+
+  /* Specific elements from ref */
+  /* Specialized Cart Items */
+  .qty-control-wrapper {
+    @apply flex items-center bg-[#f8f5f0] rounded-xl border border-borde/40 p-1 gap-1 shadow-inner;
+  }
+
+  .cart-item-qty-btn {
+    @apply w-8 h-8 rounded-lg bg-white text-cafe flex items-center justify-center font-black shadow-sm transition-all hover:bg-cafe hover:text-white active:scale-90 border border-borde/20;
+  }
+
+  /* Institutional variants */
+  .institutional-blue {
+    @apply bg-[#3b82f6];
+  }
+
+  .institutional-text-blue {
+    @apply text-[#3b82f6];
+  }
+
+  /* Redefining to use CAFE as per user request (Reference Design + Institutional Colors) */
+  /* User said "asi necesito el diseño pero con los colores institucionales" */
+  /* This means BLUE in reference -> CAFE/CARAMELO in our app */
+  .category-pill.active-inst {
+    @apply bg-cafe text-white border-cafe shadow-lg shadow-cafe/20;
+  }
+
+  .btn-pos-main-inst {
+    @apply bg-cafe shadow-cafe/20;
+  }
+
+  /* Notification System */
+  #notification-container {
+    @apply fixed top-10 right-10 z-[1000] flex flex-col gap-4 w-96 pointer-events-none;
+  }
+
+  .notification-toast {
+    @apply pointer-events-auto bg-white border-l-8 shadow-2xl p-6 flex gap-5 items-start max-w-sm border-r border-t border-b border-borde/10;
+    animation: slideInRight 0.4s ease-out forwards;
+    transition: all 0.3s ease;
+  }
+
+  .notification-toast.error {
+    @apply border-l-rojoaviso;
+  }
+
+  .notification-toast.success {
+    @apply border-l-verdeok;
+  }
+
+  .notification-toast.warning {
+    @apply border-l-caramelo;
+  }
+
+  .notification-toast.info {
+    @apply border-l-cafe;
+  }
+}
+
+/* Animations for Notifications */
+@keyframes slideInRight {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+.animate-fadeOut {
+  animation: fadeOutDown 0.4s forwards ease-in;
+}

@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-image:
+      radial-gradient(circle at top left, rgba(183, 123, 66, 0.14), transparent 32%),
+      linear-gradient(180deg, #f7f2ea 0%, #f1ebdf 100%);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #ccb89b;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #efe5d7;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-borde bg-papel shadow-panel;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-borde bg-white px-4 py-3 text-sm outline-none transition focus:border-caramelo focus:ring-2 focus:ring-caramelo/20;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-cafe px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#4a2f1d] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary:disabled {
+    @apply opacity-30 cursor-not-allowed;
+  }
+
+  /* Custom Toggle Switch */
+  .switch {
+    @apply relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-cafe/50 focus:ring-offset-2;
+  }
+
+  .switch[aria-checked="true"] {
+    @apply bg-verdeok;
+  }
+
+  .switch[aria-checked="false"] {
+    @apply bg-cafe/20;
+  }
+
+  .switch-thumb {
+    @apply pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out;
+  }
+
+  .switch[aria-checked="true"] .switch-thumb {
+    @apply translate-x-5;
+  }
+
+  .switch[aria-checked="false"] .switch-thumb {
+    @apply translate-x-0;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-borde bg-white px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-[#f6efe4];
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-[#584434] transition hover:bg-[#f1e6d8];
+  }
+
+  .nav-item-active {
+    @apply bg-[#ead9c4] text-cafe;
+  }
+}

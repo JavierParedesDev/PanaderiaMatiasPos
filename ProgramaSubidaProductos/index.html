@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Programa Subida Productos</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="eyebrow">Panaderia Matias</p>
+        <h1>Importador de productos desde Excel</h1>
+        <p class="lead">
+          Carga un archivo Excel, revisa las columnas y envia cada producto a tu
+          servidor usando la ruta <code>/api/productos</code>.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="grid two">
+          <label class="field">
+            <span>URL base del servidor</span>
+            <input
+              id="apiUrl"
+              type="text"
+              placeholder="http://64.176.20.67:3000"
+              value="http://64.176.20.67:3000"
+            />
+          </label>
+
+          <label class="field">
+            <span>Usuario</span>
+            <input
+              id="username"
+              type="text"
+              placeholder="Ingresa tu usuario"
+              autocomplete="username"
+            />
+          </label>
+
+          <label class="field">
+            <span>Contrasena</span>
+            <input
+              id="password"
+              type="password"
+              placeholder="Ingresa tu contrasena"
+              autocomplete="current-password"
+            />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="iniciarSesion" class="secondary">Iniciar sesion</button>
+          <button id="seleccionarExcel" class="primary">Seleccionar Excel</button>
+          <button id="importarProductos" class="secondary" disabled>Importar productos</button>
+        </div>
+
+        <div id="authStatus" class="auth-status">Sesion no iniciada.</div>
+        <div id="fileInfo" class="file-info"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Mapeo de columnas</h2>
+          <p>Ajusta cada campo para que coincida con los nombres de tu Excel.</p>
+        </div>
+        <div id="mapeoColumnas" class="mapping-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Vista previa</h2>
+          <p>Se muestran las primeras filas detectadas en la primera hoja del archivo.</p>
+        </div>
+        <div id="tablaPreview" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Registro de carga</h2>
+          <p>Aqui veras los productos creados y los errores reportados por la API.</p>
+        </div>
+        <div id="logArea" class="log-area"></div>
+      </section>
+    </main>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

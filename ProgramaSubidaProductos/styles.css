@@ -1,0 +1,247 @@
+:root {
+  --bg: #efe4d2;
+  --panel: rgba(255, 250, 240, 0.86);
+  --line: rgba(92, 51, 23, 0.14);
+  --text: #3b2415;
+  --muted: #7b5a43;
+  --accent: #9f4f20;
+  --accent-strong: #7d3710;
+  --soft: #fff6eb;
+  --error: #b43f3f;
+  --ok: #355f3d;
+  --shadow: 0 24px 60px rgba(89, 54, 29, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.65), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(159, 79, 32, 0.14), transparent 20%),
+    linear-gradient(135deg, #f7efdf 0%, #e8d6be 100%);
+}
+
+.app-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 32px auto;
+  display: grid;
+  gap: 18px;
+}
+
+.hero,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+
+.hero {
+  padding: 34px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.hero h1,
+.section-title h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+}
+
+.lead,
+.section-title p,
+.file-info,
+code,
+.field span {
+  color: var(--muted);
+}
+
+.panel {
+  padding: 24px;
+}
+
+.grid.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field input,
+.mapping-item select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 15px;
+  background: var(--soft);
+  color: var(--text);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 22px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--accent);
+  color: #fffaf2;
+}
+
+.secondary {
+  background: #ead7bf;
+  color: var(--accent-strong);
+}
+
+.file-info {
+  margin-top: 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.auth-status {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f7f1e9;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.auth-status.ok {
+  color: var(--ok);
+  border-color: rgba(53, 95, 61, 0.18);
+  background: #eff8f0;
+}
+
+.auth-status.error {
+  color: var(--error);
+  border-color: rgba(180, 63, 63, 0.18);
+  background: #fff4f4;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.mapping-item {
+  display: grid;
+  gap: 8px;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 680px;
+}
+
+th,
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  background: rgba(159, 79, 32, 0.08);
+}
+
+.log-area {
+  min-height: 200px;
+  max-height: 340px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.log-item {
+  background: #f7f1e9;
+  border: 1px solid rgba(53, 95, 61, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: var(--ok);
+}
+
+.log-item.error {
+  border-color: rgba(180, 63, 63, 0.14);
+  color: var(--error);
+  background: #fff4f4;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    width: min(100% - 18px, 1120px);
+    margin: 10px auto 18px;
+  }
+
+  .hero,
+  .panel {
+    border-radius: 20px;
+    padding: 18px;
+  }
+
+  .grid.two,
+  .section-title {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}

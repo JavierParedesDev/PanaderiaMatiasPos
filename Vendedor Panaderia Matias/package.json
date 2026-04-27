@@ -1,0 +1,77 @@
+{
+  "name": "vendedor-panaderia-matias",
+  "version": "1.0.0",
+  "description": "Terminal de ventas para el personal de Panadería Matías.",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JavierParedesDev/ActualizacionPanaderiaMatias.git"
+  },
+  "build": {
+    "appId": "com.panaderiamatias.vendedor",
+    "productName": "Matías Ventas",
+    "copyright": "© 2025 Panadería Matías",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Matías Ventas"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*",
+      "!**/scripts/**/*",
+      "!**/dist/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JavierParedesDev",
+        "repo": "ActualizacionPanaderiaMatias"
+      }
+    ]
+  },
+  "scripts": {
+    "start": "set ELECTRON_RUN_AS_NODE=&& npm run build:css && electron .",
+    "dev": "set ELECTRON_RUN_AS_NODE=&& npm run build:css && electron .",
+    "build:css": "tailwindcss -i ./src/renderer/styles/input.css -o ./src/renderer/styles/output.css --minify",
+    "dist": "npm run build:css && electron-builder --win --x64",
+    "dist:publish": "npm run build:css && electron-builder --win --x64 --publish always"
+  },
+  "keywords": [
+    "electron",
+    "tailwind",
+    "panaderia",
+    "ventas"
+  ],
+  "author": "Codex",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "electron": "^28.3.3",
+    "electron-builder": "^26.8.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
+  }
+}
