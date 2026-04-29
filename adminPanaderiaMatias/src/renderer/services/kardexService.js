@@ -1,20 +1,30 @@
 import { apiClient } from './apiClient.js';
 
-// Kardex - Auditoría global de movimientos
-export async function getKardexTodos() {
-    return apiClient.get('/kardex/todos');
+function buildQuery(params = {}) {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value));
+    }
+  });
+
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : '';
+}
+
+export async function getKardexTodos(params = {}) {
+  return apiClient.get(`/kardex/todos${buildQuery(params)}`);
 }
 
 export async function getKardexProducto(idProducto, idSucursal) {
-    return apiClient.get(`/kardex/producto/${idProducto}/${idSucursal}`);
+  return apiClient.get(`/kardex/producto/${idProducto}/${idSucursal}`);
 }
 
-// Facturas - Ingreso de mercadería de proveedores (endpoint: /api/facturas)
 export async function ingresarFactura(datos) {
-    return apiClient.post('/facturas', datos);
+  return apiClient.post('/facturas', datos);
 }
 
-// Mermas - Registro de pérdidas (endpoint: /api/mermas)
 export async function registrarMerma(datos) {
-    return apiClient.post('/mermas', datos);
+  return apiClient.post('/mermas', datos);
 }

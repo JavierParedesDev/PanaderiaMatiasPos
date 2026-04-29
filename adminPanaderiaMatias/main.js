@@ -1,5 +1,114 @@
 const path = require('path');
-const { app, BrowserWindow } = require('electron');
+const net = require('net');
+const { app, BrowserWindow, ipcMain } = require('electron');
+
+const DEFAULT_SCALE_TIMEOUT_MS = 8000;
+
+function toPayloadBuffer(payload) {
+  if (typeof payload === 'string') {
+    return Buffer.from(payload, 'utf8');
+  }
+
+  if (Buffer.isBuffer(payload)) {
+    return payload;
+  }
+
+  if (ArrayBuffer.isView(payload)) {
+    return Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength);
+  }
+
+  if (payload instanceof ArrayBuffer) {
+    return Buffer.from(payload);
+  }
+
+  if (payload?.type === 'Buffer' && Array.isArray(payload.data)) {
+    return Buffer.from(payload.data);
+  }
+
+  if (Array.isArray(payload)) {
+    return Buffer.from(payload);
+  }
+
+  return Buffer.from(payload);
+}
+
+function sendScalePayload({ host, port, payload, timeoutMs = DEFAULT_SCALE_TIMEOUT_MS }) {
+  return new Promise((resolve, reject) => {
+    const targetHost = String(host || '').trim();
+    const targetPort = Number(port);
+
+    if (!targetHost) {
+      reject(new Error('Debes indicar la IP de la balanza.'));
+      return;
+    }
+
+    if (!Number.isInteger(targetPort) || targetPort <= 0 || targetPort > 65535) {
+      reject(new Error('Debes indicar un puerto valido para la balanza.'));
+      return;
+    }
+
+    if (!payload) {
+      reject(new Error('No hay datos PLU para enviar.'));
+      return;
+    }
+
+    const payloadBuffer = toPayloadBuffer(payload);
+
+    let settled = false;
+    let responseBuffer = Buffer.alloc(0);
+    const socket = new net.Socket();
+
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(result);
+    };
+
+    socket.setTimeout(Number(timeoutMs) || DEFAULT_SCALE_TIMEOUT_MS);
+
+    socket.once('connect', () => {
+      socket.write(payloadBuffer, () => {
+        setTimeout(() => {
+          socket.end();
+        }, 250);
+      });
+    });
+
+    socket.on('data', (chunk) => {
+      responseBuffer = Buffer.concat([responseBuffer, chunk]);
+    });
+
+    socket.once('timeout', () => {
+      finish(new Error(`Tiempo de espera agotado conectando a ${targetHost}:${targetPort}.`));
+    });
+
+    socket.once('error', (error) => {
+      finish(new Error(`No se pudo conectar con la balanza: ${error.message}`));
+    });
+
+    socket.once('close', (hadError) => {
+      if (hadError) return;
+
+      finish(null, {
+        success: true,
+        host: targetHost,
+        port: targetPort,
+        bytesSent: payloadBuffer.length,
+        response: responseBuffer.toString('utf8'),
+        responseHex: responseBuffer.toString('hex').toUpperCase().match(/.{1,2}/g)?.join(' ') || ''
+      });
+    });
+
+    socket.connect(targetPort, targetHost);
+  });
+}
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -21,6 +130,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle('scale:send-plu', async (_event, payload) => sendScalePayload(payload));
+
   createWindow();
 
   app.on('activate', () => {
