@@ -1,5 +1,6 @@
 const path = require('path');
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { spawn } = require('child_process');
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -33,54 +34,46 @@ app.whenReady().then(() => {
   createWindow();
 
   ipcMain.handle('print-ticket', async (event, ticketData = {}) => {
-    let printWindow = new BrowserWindow({
-      show: false,
-      webPreferences: { nodeIntegration: false, contextIsolation: true }
-    });
-
-    const items = Array.isArray(ticketData.items) ? ticketData.items : [];
-    const total = Number(ticketData.total || 0);
-
-    const html = `
-      <html>
-        <body style="font-family: 'Courier New', Courier, monospace; width: 80mm; margin: 0; padding: 10px; font-size: 12px;">
-          <div style="text-align: center;">
-            <h2 style="margin: 0;">PANADERIA MATÍAS</h2>
-            <p style="margin: 5px 0;">Folio: ${escapeHtml(ticketData.folio)}</p>
-            <p style="margin: 5px 0;">Fecha: ${new Date().toLocaleString()}</p>
-          </div>
-          <hr style="border: 0; border-top: 1px dashed black;">
-          <table style="width: 100%; border-collapse: collapse;">
-            ${items.map(item => `
-              <tr>
-                <td>${Number(item.cantidad || 0)} x ${escapeHtml(String(item.nombre || '').substring(0, 20))}</td>
-                <td style="text-align: right;">$${(Number(item.cantidad || 0) * Number(item.precio_unitario || 0)).toLocaleString()}</td>
-              </tr>
-            `).join('')}
-          </table>
-          <hr style="border: 0; border-top: 1px dashed black;">
-          <div style="text-align: right; font-weight: bold; font-size: 16px;">
-            TOTAL: $${total.toLocaleString()}
-          </div>
-          <div style="margin-top: 10px; text-align: center; font-size: 10px;">
-            METODO: ${escapeHtml(ticketData.metodo)}
-          </div>
-          <div style="margin-top: 20px; text-align: center;">
-            ¡Gracias por su compra!
-          </div>
-        </body>
-      </html>
-    `;
-
-    printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-
     return new Promise((resolve) => {
-      printWindow.webContents.on('did-finish-load', () => {
-        printWindow.webContents.print({ silent: true, printBackground: true }, (success, failureReason) => {
-          printWindow.close();
-          resolve({ success, failureReason });
-        });
+      // Ruta al script de Python
+      const scriptPath = path.join(__dirname, 'scripts/printer.py');
+
+      // Ejecutar el proceso de Python
+      const pythonProcess = spawn('python', [scriptPath]);
+
+      let outputData = '';
+      let errorData = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        outputData += data.toString();
       });
+
+      pythonProcess.stderr.on('data', (data) => {
+        errorData += data.toString();
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`Python process exited with code ${code}. Error: ${errorData}`);
+          resolve({ success: false, error: errorData || `Error de ejecución (código ${code})` });
+          return;
+        }
+
+        try {
+          const result = JSON.parse(outputData);
+          resolve(result);
+        } catch (e) {
+          console.error('Error parsing Python output:', outputData);
+          resolve({ success: false, error: 'Error al procesar la respuesta de la impresora.' });
+        }
+      });
+
+      // Enviar datos vía stdin en formato JSON
+      pythonProcess.stdin.write(JSON.stringify({
+        ...ticketData,
+        fecha: new Date().toLocaleString('es-CL') // Asegurar fecha local si no viene
+      }));
+      pythonProcess.stdin.end();
     });
   });
 
