@@ -12,3 +12,7 @@ export async function abrirTurno(datos) {
 export async function cerrarTurno(datos) {
     return apiClient.post('/turnos/cerrar', datos);
 }
+
+export async function getResumenTurno(id) {
+    return apiClient.get(`/turnos/${id}/resumen`);
+}

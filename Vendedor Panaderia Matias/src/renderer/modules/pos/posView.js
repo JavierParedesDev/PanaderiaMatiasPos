@@ -1,13 +1,13 @@
-import { getProductos } from '../../services/productService.js';
-import { getCategorias } from '../../services/masterService.js';
-import { registrarVenta } from '../../services/saleService.js';
-import { formatCurrency, escapeHtml } from '../../utils/formatters.js';
-import { showNotification } from '../../utils/notifications.js';
-import { getSession } from '../../state/sessionStore.js';
+import { getProductos } from "../../services/productService.js";
+import { getCategorias } from "../../services/masterService.js";
+import { registrarVenta } from "../../services/saleService.js";
+import { formatCurrency, escapeHtml } from "../../utils/formatters.js";
+import { showNotification } from "../../utils/notifications.js";
+import { getSession } from "../../state/sessionStore.js";
 
 let allProducts = [];
 let cart = [];
-let selectedPaymentMethod = 'Efectivo';
+let selectedPaymentMethod = "Efectivo";
 let searchResults = [];
 let currentShift = null;
 let paymentMethods = [];
@@ -18,7 +18,10 @@ function getStock(product) {
 }
 
 function getCartTotal() {
-  return cart.reduce((acc, item) => acc + ((item.precio_venta || 0) * item.quantity), 0);
+  return cart.reduce(
+    (acc, item) => acc + (item.precio_venta || 0) * item.quantity,
+    0,
+  );
 }
 
 export function renderPosSkeleton() {
@@ -97,6 +100,19 @@ export function renderPosSkeleton() {
                 </button>
              </div>
           </div>
+        </div>
+
+        <!-- Selector Ancho de Papel + Toggle Impresión -->
+        <div class="px-4 pb-2 flex items-center justify-between">
+          <span class="text-[9px] font-black text-cafe/30 uppercase tracking-[0.2em]">🖨 Papel</span>
+          <div class="flex gap-2">
+            <button id="paper-50-btn" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-borde/30 transition-all">50mm</button>
+            <button id="paper-80-btn" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-borde/30 transition-all">80mm</button>
+          </div>
+        </div>
+        <div class="px-4 pb-3 flex items-center justify-between">
+          <span class="text-[9px] font-black text-cafe/30 uppercase tracking-[0.2em]">🧳 Ticket</span>
+          <button id="print-toggle-btn" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-borde/30 transition-all">ON</button>
         </div>
 
         <!-- Botón Cobrar (VERDE / CUADRADO TOTAL AL FONDO) -->
@@ -184,36 +200,49 @@ export function renderPosSkeleton() {
         </form>
       </div>
     </div>
+
+    <!-- Modal de Peso -->
+    <div id="weight-modal" class="hidden fixed inset-0 flex items-center justify-center p-4 bg-cafe/90 backdrop-blur-md" style="z-index: 9999;">
+      <div class="panel w-full max-w-sm bg-white p-10 space-y-6 text-center animate-zoomIn shadow-2xl">
+        <h3 class="text-xl font-black text-cafe uppercase italic tracking-tighter" id="weight-product-name">Producto</h3>
+        <p class="text-[10px] font-bold text-cafe/40 uppercase tracking-[0.2em] mt-2">Ingrese cantidad en KILOS (ej. 0.500)</p>
+        <input id="weight-input" type="number" step="0.001" min="0.001" class="w-full h-16 bg-papel border-2 border-borde/40 rounded-2xl px-6 text-3xl font-black text-center outline-none focus:border-caramelo transition-all text-cafe" placeholder="0.000">
+        <div class="flex gap-4 pt-4">
+          <button id="weight-cancel" class="flex-1 py-4 rounded-xl font-black uppercase text-xs tracking-widest text-cafe/40 hover:bg-papel transition-all">Cancelar</button>
+          <button id="weight-confirm" class="flex-1 py-4 rounded-xl bg-caramelo text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-caramelo/30 hover:scale-105 active:scale-95 transition-all">Agregar</button>
+        </div>
+      </div>
+    </div>
   `;
 }
 
 export async function hydratePosView() {
-  const searchInput = document.querySelector('#header-search');
-  const headerResults = document.querySelector('#header-search-results');
-  const cartItemsContainer = document.querySelector('#cart-items');
-  const cartTotal = document.querySelector('#cart-total');
-  const cartSubtotal = document.querySelector('#cart-subtotal');
-  const cartCount = document.querySelector('#cart-count');
-  const payButton = document.querySelector('#pay-button');
-  const payButtonText = document.querySelector('#pay-button-text');
-  const clearCartBtn = document.querySelector('#clear-cart');
-  const methodBtns = document.querySelectorAll('.pay-method-btn');
+  const searchInput = document.querySelector("#header-search");
+  const headerResults = document.querySelector("#header-search-results");
+  const cartItemsContainer = document.querySelector("#cart-items");
+  const cartTotal = document.querySelector("#cart-total");
+  const cartSubtotal = document.querySelector("#cart-subtotal");
+  const cartCount = document.querySelector("#cart-count");
+  const payButton = document.querySelector("#pay-button");
+  const payButtonText = document.querySelector("#pay-button-text");
+  const clearCartBtn = document.querySelector("#clear-cart");
+  const methodBtns = document.querySelectorAll(".pay-method-btn");
 
-  const paymentModal = document.querySelector('#payment-modal');
-  const closePaymentModalBtn = document.querySelector('#close-payment-modal');
-  const modalTotal = document.querySelector('#modal-payment-total');
+  const paymentModal = document.querySelector("#payment-modal");
+  const closePaymentModalBtn = document.querySelector("#close-payment-modal");
+  const modalTotal = document.querySelector("#modal-payment-total");
 
   // Selectores Confirmación
-  const confirmModal = document.querySelector('#confirm-modal');
-  const confirmTitle = document.querySelector('#confirm-title');
-  const confirmMsg = document.querySelector('#confirm-message');
-  const confirmOkBtn = document.querySelector('#confirm-ok');
-  const confirmCancelBtn = document.querySelector('#confirm-cancel');
+  const confirmModal = document.querySelector("#confirm-modal");
+  const confirmTitle = document.querySelector("#confirm-title");
+  const confirmMsg = document.querySelector("#confirm-message");
+  const confirmOkBtn = document.querySelector("#confirm-ok");
+  const confirmCancelBtn = document.querySelector("#confirm-cancel");
 
   function showConfirm(title, message, onConfirm) {
     confirmTitle.textContent = title;
     confirmMsg.textContent = message;
-    confirmModal.classList.remove('hidden');
+    confirmModal.classList.remove("hidden");
 
     // Clonar para limpiar handlers viejos
     const newOk = confirmOkBtn.cloneNode(true);
@@ -221,98 +250,115 @@ export async function hydratePosView() {
     const newCancel = confirmCancelBtn.cloneNode(true);
     confirmCancelBtn.parentNode.replaceChild(newCancel, confirmCancelBtn);
 
-    newOk.addEventListener('click', () => {
-      confirmModal.classList.add('hidden');
+    newOk.addEventListener("click", () => {
+      confirmModal.classList.add("hidden");
       onConfirm();
     });
-    newCancel.addEventListener('click', () => {
-      confirmModal.classList.add('hidden');
+    newCancel.addEventListener("click", () => {
+      confirmModal.classList.add("hidden");
     });
   }
 
   async function loadData() {
-    try {
-      const session = getSession();
-      const userId = session?.usuario?.id;
+    const session = getSession();
+    const userId = session?.usuario?.id;
 
-      // 1. Verificar Turno PRIMERO para mostrar modal rápido
-      const { getTurnos } = await import('../../services/shiftService.js');
-      const sRes = await getTurnos({ estado: 'Abierto' });
-      currentShift = (sRes.data || []).find(t => t.id_usuario === userId);
+    // 1. Verificar Turno (independiente - si falla no bloquea los productos)
+    try {
+      const { getTurnos } = await import("../../services/shiftService.js");
+      const sRes = await getTurnos({ estado: "Abierto" });
+      currentShift = (sRes.data || []).find((t) => t.id_usuario === userId);
 
       if (!currentShift) {
-        document.querySelector('#open-shift-modal')?.classList.remove('hidden');
-        document.querySelector('#monto-apertura-pos')?.focus();
+        document.querySelector("#open-shift-modal")?.classList.remove("hidden");
+        document.querySelector("#monto-apertura-pos")?.focus();
       }
+    } catch (e) {
+      console.warn("No se pudo verificar turno (servidor):", e.message || e);
+      // Permitir operar sin turno si el servidor falla
+    }
 
-      // 2. Cargar el resto en segundo plano o después
+    // 2. Cargar productos (siempre, independiente del turno)
+    try {
       const pRes = await getProductos();
       allProducts = (pRes.data || [])
-        .filter(p => p.activo)
-        .map(p => ({ ...p, stock_actual: getStock(p) }));
+        .filter((p) => p.activo)
+        .map((p) => ({ ...p, stock_actual: getStock(p) }));
+    } catch (e) {
+      console.error("Error al cargar productos:", e);
+    }
 
-      const { getMetodosPago } = await import('../../services/masterService.js');
+    // 3. Cargar métodos de pago
+    try {
+      const { getMetodosPago } = await import("../../services/masterService.js");
       const mRes = await getMetodosPago();
       paymentMethods = mRes.data || [];
-
     } catch (e) {
-      console.error('Error al cargar datos iniciales POS:', e);
+      console.error("Error al cargar métodos de pago:", e);
     }
   }
 
-  const openShiftForm = document.querySelector('#open-shift-form');
-  openShiftForm?.addEventListener('submit', async (e) => {
+  const openShiftForm = document.querySelector("#open-shift-form");
+  openShiftForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const monto = Number(document.querySelector('#monto-apertura-pos').value);
-    const tipo = document.querySelector('#tipo-turno-pos').value;
+    const monto = Number(document.querySelector("#monto-apertura-pos").value);
+    const tipo = document.querySelector("#tipo-turno-pos").value;
 
     try {
-      const { abrirTurno } = await import('../../services/shiftService.js');
+      const { abrirTurno } = await import("../../services/shiftService.js");
       const res = await abrirTurno({ tipo_turno: tipo, monto_apertura: monto });
 
       currentShift = res.turno;
-      document.querySelector('#open-shift-modal').classList.add('hidden');
-      showNotification('¡TURNO ABIERTO! Ya puedes vender.', 'success');
+      document.querySelector("#open-shift-modal").classList.add("hidden");
+      showNotification("¡TURNO ABIERTO! Ya puedes vender.", "success");
       searchInput.focus();
     } catch (error) {
-      showNotification(error.message || 'Error al abrir turno', 'error');
+      showNotification(error.message || "Error al abrir turno", "error");
     }
   });
 
   // Escuchar búsqueda desde el evento global de app.js
-  window.addEventListener('pos-search', (e) => {
-    const term = (e.detail || '').trim().toLowerCase();
+  if (window._posSearchListener)
+    window.removeEventListener("pos-search", window._posSearchListener);
+  window._posSearchListener = (e) => {
+    const term = (e.detail || "").trim().toLowerCase();
 
     if (term.length < 2) {
-      headerResults.classList.add('hidden');
+      headerResults.classList.add("hidden");
       return;
     }
 
-    const filtered = allProducts.filter(p =>
-      p.nombre.toLowerCase().includes(term) ||
-      (p.codigo_interno || '').toLowerCase().includes(term) ||
-      (p.codigo_barra_externo || '').toLowerCase().includes(term)
-    ).slice(0, 15);
+    const filtered = allProducts
+      .filter(
+        (p) =>
+          p.nombre.toLowerCase().includes(term) ||
+          (p.codigo_interno || "").toLowerCase().includes(term) ||
+          (p.codigo_barra_externo || "").toLowerCase().includes(term),
+      )
+      .slice(0, 15);
 
     // AUTO-ADD si hay coincidencia EXACTA por código (Ideal para Scanners)
-    const exactMatch = allProducts.find(p =>
-      (p.codigo_interno || '').toLowerCase() === term ||
-      (p.codigo_barra_externo || '').toLowerCase() === term
+    const exactMatch = allProducts.find(
+      (p) =>
+        (p.codigo_interno || "").toLowerCase() === term ||
+        (p.codigo_barra_externo || "").toLowerCase() === term,
     );
 
     if (exactMatch) {
       addToCart(exactMatch.id);
-      headerResults.classList.add('hidden');
+      headerResults.classList.add("hidden");
       if (searchInput) {
-        searchInput.value = '';
+        searchInput.value = "";
         searchInput.focus();
       }
       return; // Detener flujo para no mostrar dropdown
     }
 
     if (filtered.length > 0) {
-      headerResults.classList.remove('hidden');
-      headerResults.innerHTML = filtered.map(p => `
+      headerResults.classList.remove("hidden");
+      headerResults.innerHTML = filtered
+        .map(
+          (p) => `
         <div class="search-result-item group p-8 border-b border-borde/5" data-id="${p.id}">
           <div class="flex-1 min-w-0 pr-6">
              <p class="text-sm font-black text-cafe uppercase truncate">${escapeHtml(p.nombre)}</p>
@@ -320,58 +366,134 @@ export async function hydratePosView() {
           </div>
           <button class="add-btn w-12 h-12 text-2xl shadow-md" data-id="${p.id}">+</button>
         </div>
-      `).join('');
+      `,
+        )
+        .join("");
 
-      headerResults.querySelectorAll('.search-result-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const id = Number(item.dataset.id);
+      headerResults.querySelectorAll(".search-result-item").forEach((item) => {
+        item.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const id = item.dataset.id;
           addToCart(id);
-          headerResults.classList.add('hidden');
+          headerResults.classList.add("hidden");
           if (searchInput) {
-            searchInput.value = '';
+            searchInput.value = "";
             searchInput.focus();
           }
         });
       });
     } else {
-      headerResults.classList.remove('hidden');
+      headerResults.classList.remove("hidden");
       headerResults.innerHTML = `
         <div class="p-10 text-center opacity-40">
           <p class="text-xs font-black uppercase tracking-widest text-cafe/50">Nada encontrado</p>
         </div>
       `;
     }
-  });
+  };
+  window.addEventListener("pos-search", window._posSearchListener);
 
   if (searchInput && headerResults) {
     // Cerrar al clickear fuera
-    document.addEventListener('click', (e) => {
-      if (!searchInput.contains(e.target) && !headerResults.contains(e.target)) {
-        headerResults.classList.add('hidden');
+    if (window._posClickListener)
+      document.removeEventListener("click", window._posClickListener);
+    window._posClickListener = (e) => {
+      if (
+        !searchInput.contains(e.target) &&
+        !headerResults.contains(e.target)
+      ) {
+        headerResults.classList.add("hidden");
       }
-    });
+    };
+    document.addEventListener("click", window._posClickListener);
   }
 
-  function addToCart(productId) {
-    const product = allProducts.find(p => p.id === productId);
+  function isPesable(product) {
+    const flag = product?.pesable;
+    return flag === true || flag === 1 || flag === "1" || flag === "true";
+  }
+
+  function showWeightModal(product, onConfirm) {
+    // Eliminar modal anterior si existe
+    const old = document.getElementById('_dyn_weight_modal');
+    if (old) old.remove();
+
+    const modal = document.createElement('div');
+    modal.id = '_dyn_weight_modal';
+    modal.style.cssText = 'display:flex; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; align-items:center; justify-content:center; background:rgba(0,0,0,0.82);';
+    modal.innerHTML = `
+      <div style="background:#fff; border-radius:20px; padding:40px 36px; max-width:380px; width:92%; text-align:center; box-shadow:0 30px 60px rgba(0,0,0,0.5);">
+        <p style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:3px; color:#aaa; margin:0 0 8px;">PRODUCTO PESABLE</p>
+        <h3 style="font-size:1.15rem; font-weight:900; text-transform:uppercase; color:#3d2b1f; margin:0 0 20px; line-height:1.3;">${product.nombre}</h3>
+        <p style="font-size:11px; font-weight:700; color:#aaa; margin:0 0 12px; letter-spacing:1px;">Ingrese cantidad en KILOS (ej: 0.500)</p>
+        <input id="_dyn_weight_input" type="number" step="0.001" min="0.001"
+          style="width:100%; height:68px; border:2px solid #e0d5cc; border-radius:14px; padding:0 20px; font-size:2.2rem; font-weight:900; text-align:center; outline:none; color:#3d2b1f; box-sizing:border-box; font-family:monospace;"
+          placeholder="0.000">
+        <div style="display:flex; gap:12px; margin-top:20px;">
+          <button id="_dyn_weight_cancel" style="flex:1; padding:15px; border-radius:12px; border:2px solid #eee; background:none; font-weight:800; text-transform:uppercase; font-size:11px; cursor:pointer; color:#bbb; letter-spacing:1px;">Cancelar</button>
+          <button id="_dyn_weight_confirm" style="flex:1; padding:15px; border-radius:12px; border:none; background:#c47a2a; color:#fff; font-weight:900; text-transform:uppercase; font-size:11px; cursor:pointer; letter-spacing:1px; box-shadow:0 6px 16px rgba(196,122,42,0.45);">&#10003; Agregar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const input = document.getElementById('_dyn_weight_input');
+    const cancelBtn = document.getElementById('_dyn_weight_cancel');
+    const confirmBtn = document.getElementById('_dyn_weight_confirm');
+
+    const hide = () => modal.remove();
+
+    cancelBtn.addEventListener('click', hide);
+    confirmBtn.addEventListener('click', () => {
+      const weight = Number(input.value);
+      if (isNaN(weight) || weight <= 0) {
+        showNotification('Ingrese un peso v\u00e1lido mayor a 0', 'warning');
+        return;
+      }
+      hide();
+      onConfirm(weight);
+    });
+    input.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') confirmBtn.click();
+      if (e.key === 'Escape') cancelBtn.click();
+    });
+    setTimeout(() => input.focus(), 60);
+  }
+
+
+  function addToCart(productId, bypassWeightCheck = false, forcedQuantity = 1) {
+    const product = allProducts.find((p) => p.id == productId);
     if (!product) return;
 
-    // Validación de stock
-    const existing = cart.find(i => i.id === productId);
-    const currentQty = existing ? existing.quantity : 0;
+    const pesable = isPesable(product);
 
-    if (getStock(product) <= currentQty) {
-      showNotification(`STOCK INSUFICIENTE: Solo quedan ${getStock(product)} unidades de ${product.nombre}`, 'warning');
+    if (!bypassWeightCheck && pesable) {
+      showWeightModal(product, (weight) => {
+        addToCart(productId, true, weight);
+      });
+      return;
+    }
+
+    const existing = cart.find((i) => i.id == productId);
+    const currentQty = existing ? existing.quantity : 0;
+    const stock = getStock(product);
+
+    // Solo bloquear si el stock es mayor que 0 Y está agotado
+    if (stock > 0 && stock <= currentQty) {
+      showNotification(
+        `STOCK INSUFICIENTE: Solo quedan ${stock} unidades de ${product.nombre}`,
+        "warning",
+      );
       return;
     }
 
     if (existing) {
-      existing.quantity++;
+      existing.quantity += forcedQuantity;
       const idx = cart.indexOf(existing);
       cart.splice(idx, 1);
       cart.unshift(existing);
     } else {
-      cart.unshift({ ...product, quantity: 1 });
+      cart.unshift({ ...product, quantity: forcedQuantity });
     }
     updateCartUI();
   }
@@ -385,9 +507,11 @@ export async function hydratePosView() {
          </div>
        `;
       payButton.disabled = true;
-      payButtonText.textContent = 'COBRAR $ 0';
+      payButtonText.textContent = "COBRAR $ 0";
     } else {
-      cartItemsContainer.innerHTML = cart.map((item, idx) => `
+      cartItemsContainer.innerHTML = cart
+        .map(
+          (item, idx) => `
          <div class="flex items-center px-8 py-8 bg-white border-b border-borde/5 hover:bg-cafe/[0.01] transition-all group animate-slideInRight" style="animation-delay: ${idx * 0.05}s">
             <!-- Col 1: Info Producto (flex-1) -->
             <div class="flex-1 min-w-0 pr-12">
@@ -396,8 +520,8 @@ export async function hydratePosView() {
                   <div>
                     <h4 class="text-3xl font-black text-cafe uppercase tracking-tighter leading-tight">${escapeHtml(item.nombre)}</h4>
                     <div class="flex items-center gap-4 mt-2">
-                        <span class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.2em] bg-papel px-2.5 py-1 rounded-md">${item.codigo_interno || 'SKU'}</span>
-                        <span class="text-[10px] font-black text-caramelo uppercase tracking-[0.1em] italic text-xs">${item.categoria || 'Sin Categoría'}</span>
+                        <span class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.2em] bg-papel px-2.5 py-1 rounded-md">${item.codigo_interno || "SKU"}</span>
+                        <span class="text-[10px] font-black text-caramelo uppercase tracking-[0.1em] italic text-xs">${item.categoria || "Sin Categoría"}</span>
                     </div>
                   </div>
                </div>
@@ -407,7 +531,7 @@ export async function hydratePosView() {
             <div class="w-40 flex justify-center shrink-0">
                <div class="qty-control-wrapper shadow-lg scale-125">
                   <button class="cart-item-qty-btn" data-action="dec" data-id="${item.id}">−</button>
-                  <span class="text-2xl font-black text-cafe w-12 text-center select-none tracking-tighter tabular-nums">${item.quantity}</span>
+                  <span class="text-2xl font-black text-cafe w-auto min-w-[3rem] px-2 text-center select-none tracking-tighter tabular-nums">${item.quantity % 1 !== 0 ? item.quantity.toFixed(3) : item.quantity}</span>
                   <button class="cart-item-qty-btn" data-action="inc" data-id="${item.id}">+</button>
                </div>
             </div>
@@ -429,28 +553,32 @@ export async function hydratePosView() {
                <button class="w-10 h-10 rounded-xl flex items-center justify-center bg-rojoaviso text-white shadow-md hover:bg-rojoaviso/90 active:scale-95 transition-all text-sm font-black" data-action="remove" data-id="${item.id}">✕</button>
             </div>
          </div>
-       `).join('');
+       `,
+        )
+        .join("");
 
       payButton.disabled = false;
 
-      cartItemsContainer.querySelectorAll('[data-action]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = Number(btn.dataset.id);
+      cartItemsContainer.querySelectorAll("[data-action]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
           const action = btn.dataset.action;
-          const item = cart.find(i => i.id === id);
-          if (action === 'inc') {
-            const product = allProducts.find(p => p.id === id) || item;
+          const item = cart.find((i) => i.id == id);
+          if (action === "inc") {
+            const product = allProducts.find((p) => p.id == id) || item;
             if (getStock(product) <= item.quantity) {
-              showNotification(`STOCK INSUFICIENTE: Solo quedan ${getStock(product)} unidades de ${item.nombre}`, 'warning');
+              showNotification(
+                `STOCK INSUFICIENTE: Solo quedan ${getStock(product)} unidades de ${item.nombre}`,
+                "warning",
+              );
               return;
             }
             item.quantity++;
-          }
-          else if (action === 'dec') {
-            item.quantity--;
-            if (item.quantity <= 0) cart = cart.filter(i => i.id !== id);
-          } else if (action === 'remove') {
-            cart = cart.filter(i => i.id !== id);
+          } else if (action === "dec") {
+            item.quantity -= item.quantity % 1 !== 0 ? item.quantity : 1;
+            if (item.quantity <= 0) cart = cart.filter((i) => i.id != id);
+          } else if (action === "remove") {
+            cart = cart.filter((i) => i.id != id);
           }
           updateCartUI();
         });
@@ -464,37 +592,37 @@ export async function hydratePosView() {
     payButtonText.textContent = `COBRAR ${formatCurrency(total)}`;
   }
 
-  methodBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      methodBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+  methodBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      methodBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
       selectedPaymentMethod = btn.dataset.method;
     });
   });
 
-  const mixedModal = document.querySelector('#mixed-payment-modal');
-  const mixedEfectivoInput = document.querySelector('#mixed-efectivo');
-  const mixedTarjetaInput = document.querySelector('#mixed-tarjeta');
-  const confirmMixedBtn = document.querySelector('#confirm-mixed');
-  const cancelMixedBtn = document.querySelector('#cancel-mixed');
+  const mixedModal = document.querySelector("#mixed-payment-modal");
+  const mixedEfectivoInput = document.querySelector("#mixed-efectivo");
+  const mixedTarjetaInput = document.querySelector("#mixed-tarjeta");
+  const confirmMixedBtn = document.querySelector("#confirm-mixed");
+  const cancelMixedBtn = document.querySelector("#cancel-mixed");
 
   // Lógica de cálculo automático para pago mixto
-  mixedEfectivoInput.addEventListener('input', () => {
+  mixedEfectivoInput.addEventListener("input", () => {
     const total = getCartTotal();
     const efectivo = Number(mixedEfectivoInput.value) || 0;
     const tarjeta = Math.max(0, total - efectivo);
     mixedTarjetaInput.value = tarjeta;
   });
 
-  payButton.addEventListener('click', async () => {
+  payButton.addEventListener("click", async () => {
     if (isProcessingSale) return;
 
     const total = getCartTotal();
 
-    if (selectedPaymentMethod === 'Mixto') {
+    if (selectedPaymentMethod === "Mixto") {
       mixedEfectivoInput.value = 0;
       mixedTarjetaInput.value = total;
-      mixedModal.classList.remove('hidden');
+      mixedModal.classList.remove("hidden");
       mixedEfectivoInput.focus();
       mixedEfectivoInput.select();
       return;
@@ -503,7 +631,7 @@ export async function hydratePosView() {
     await processSale(total, selectedPaymentMethod);
   });
 
-  confirmMixedBtn.addEventListener('click', async () => {
+  confirmMixedBtn.addEventListener("click", async () => {
     if (isProcessingSale) return;
 
     const total = getCartTotal();
@@ -511,29 +639,39 @@ export async function hydratePosView() {
     const tarjeta = Number(mixedTarjetaInput.value) || 0;
 
     if (efectivo < 0 || efectivo > total || efectivo + tarjeta !== total) {
-      showNotification('REVISA EL PAGO MIXTO: LOS MONTOS DEBEN SUMAR EL TOTAL EXACTO', 'warning');
+      showNotification(
+        "REVISA EL PAGO MIXTO: LOS MONTOS DEBEN SUMAR EL TOTAL EXACTO",
+        "warning",
+      );
       return;
     }
 
-    mixedModal.classList.add('hidden');
-    await processSale(total, 'Mixto', { efectivo, tarjeta });
+    mixedModal.classList.add("hidden");
+    await processSale(total, "Mixto", { efectivo, tarjeta });
   });
 
-  cancelMixedBtn.addEventListener('click', () => {
-    mixedModal.classList.add('hidden');
+  cancelMixedBtn.addEventListener("click", () => {
+    mixedModal.classList.add("hidden");
   });
 
   function getPaymentMethodId(label) {
-    const normalizedLabel = String(label || '').toLowerCase();
-    const found = paymentMethods.find(m => String(m.nombre || '').toLowerCase().includes(normalizedLabel));
+    const normalizedLabel = String(label || "").toLowerCase();
+    const found = paymentMethods.find((m) =>
+      String(m.nombre || "")
+        .toLowerCase()
+        .includes(normalizedLabel),
+    );
     return found?.id || null;
   }
 
   function validateCartStock() {
     for (const item of cart) {
-      const product = allProducts.find(p => p.id === item.id) || item;
+      const product = allProducts.find((p) => p.id === item.id) || item;
       if (getStock(product) < item.quantity) {
-        showNotification(`STOCK INSUFICIENTE: Solo quedan ${getStock(product)} unidades de ${item.nombre}`, 'warning');
+        showNotification(
+          `STOCK INSUFICIENTE: Solo quedan ${getStock(product)} unidades de ${item.nombre}`,
+          "warning",
+        );
         return false;
       }
     }
@@ -542,18 +680,32 @@ export async function hydratePosView() {
 
   async function printSaleTicket(printData) {
     if (!window.electronAPI?.printTicket) {
-      showNotification('VENTA REGISTRADA, PERO LA IMPRESORA NO ESTA DISPONIBLE', 'warning');
+      showNotification(
+        "VENTA REGISTRADA, PERO LA IMPRESORA NO ESTA DISPONIBLE",
+        "warning",
+      );
       return;
     }
 
     try {
-      const result = await window.electronAPI.printTicket(printData);
+      const printerName = localStorage.getItem('selected_printer') || '';
+      const result = await window.electronAPI.printTicket({ 
+        ...printData, 
+        printer_name: printerName 
+      });
       if (!result?.success) {
-        showNotification(`VENTA REGISTRADA, PERO NO SE IMPRIMIO EL TICKET: ${result?.failureReason || 'REVISA LA IMPRESORA'}`, 'warning');
+        const printError = result?.error || result?.message || result?.failureReason || "REVISA LA IMPRESORA";
+        showNotification(
+          `VENTA REGISTRADA, PERO NO SE IMPRIMIO EL TICKET: ${printError}`,
+          "warning",
+        );
       }
     } catch (error) {
-      console.error('Print Error:', error);
-      showNotification('VENTA REGISTRADA, PERO FALLO LA IMPRESION DEL TICKET', 'warning');
+      console.error("Print Error:", error);
+      showNotification(
+        "VENTA REGISTRADA, PERO FALLO LA IMPRESION DEL TICKET",
+        "warning",
+      );
     }
   }
 
@@ -561,11 +713,11 @@ export async function hydratePosView() {
     if (isProcessingSale) return;
     if (cart.length === 0) return;
     if (!currentShift) {
-      showNotification('NO SE PUEDE COBRAR SIN UN TURNO ABIERTO', 'error');
+      showNotification("NO SE PUEDE COBRAR SIN UN TURNO ABIERTO", "error");
       return;
     }
     if (!Number.isFinite(total) || total <= 0) {
-      showNotification('EL TOTAL DE LA VENTA NO ES VALIDO', 'error');
+      showNotification("EL TOTAL DE LA VENTA NO ES VALIDO", "error");
       return;
     }
     if (!validateCartStock()) return;
@@ -573,14 +725,17 @@ export async function hydratePosView() {
     isProcessingSale = true;
     payButton.disabled = true;
     confirmMixedBtn.disabled = true;
-    payButtonText.textContent = 'PROCESANDO...';
+    payButtonText.textContent = "PROCESANDO...";
 
     let payloadPagos = [];
     if (mixedData) {
-      const efectivoMethodId = getPaymentMethodId('Efectivo');
-      const tarjetaMethodId = getPaymentMethodId('Tarjeta');
+      const efectivoMethodId = getPaymentMethodId("Efectivo");
+      const tarjetaMethodId = getPaymentMethodId("Tarjeta");
       if (!efectivoMethodId || !tarjetaMethodId) {
-        showNotification('FALTAN METODOS DE PAGO PARA REGISTRAR PAGO MIXTO', 'error');
+        showNotification(
+          "FALTAN METODOS DE PAGO PARA REGISTRAR PAGO MIXTO",
+          "error",
+        );
         isProcessingSale = false;
         payButton.disabled = false;
         confirmMixedBtn.disabled = false;
@@ -590,12 +745,12 @@ export async function hydratePosView() {
 
       payloadPagos = [
         { id_metodo_pago: efectivoMethodId, monto_pagado: mixedData.efectivo },
-        { id_metodo_pago: tarjetaMethodId, monto_pagado: mixedData.tarjeta }
+        { id_metodo_pago: tarjetaMethodId, monto_pagado: mixedData.tarjeta },
       ];
     } else {
       const methodId = getPaymentMethodId(method);
       if (!methodId) {
-        showNotification(`NO EXISTE EL METODO DE PAGO ${method}`, 'error');
+        showNotification(`NO EXISTE EL METODO DE PAGO ${method}`, "error");
         isProcessingSale = false;
         payButton.disabled = false;
         confirmMixedBtn.disabled = false;
@@ -609,35 +764,44 @@ export async function hydratePosView() {
     const payload = {
       id_turno: currentShift.id,
       total_venta: total,
-      detalle_productos: cart.map(item => ({
+      detalle_productos: cart.map((item) => ({
         id_producto: item.id,
         cantidad: item.quantity,
         precio_unitario: item.precio_venta || 0,
-        subtotal: (item.precio_venta || 0) * item.quantity
+        subtotal: (item.precio_venta || 0) * item.quantity,
       })),
-      pagos_mixtos: payloadPagos
+      pagos_mixtos: payloadPagos,
     };
 
     try {
-      console.log('Enviando Venta:', payload);
+      console.log("Enviando Venta:", payload);
 
       const res = await registrarVenta(payload);
-      console.log('Respuesta:', res);
+      console.log("Respuesta:", res);
 
-      const folio = res.venta?.folio || res.data?.folio_interno || 'N/A';
-      document.querySelector('#modal-folio').textContent = folio;
+      const folio = res.venta?.folio || res.data?.folio_interno || "N/A";
+      document.querySelector("#modal-folio").textContent = folio;
       modalTotal.textContent = formatCurrency(total);
-      paymentModal.classList.remove('hidden');
+      paymentModal.classList.remove("hidden");
+
+      const paperWidth = parseInt(localStorage.getItem('paper_width') || '80', 10);
+      const skipPrint = localStorage.getItem('print_ticket') === 'false';
 
       await printSaleTicket({
         folio: folio,
         total: total,
         metodo: method,
-        items: cart.map(i => ({ nombre: i.nombre, cantidad: i.quantity, precio_unitario: i.precio_venta || 0 }))
+        paper_width: paperWidth,
+        skip_print: skipPrint,
+        items: cart.map((i) => ({
+          nombre: i.nombre,
+          cantidad: i.quantity,
+          precio_unitario: i.precio_venta || 0,
+        })),
       });
 
-      cart.forEach(item => {
-        const product = allProducts.find(p => p.id === item.id);
+      cart.forEach((item) => {
+        const product = allProducts.find((p) => p.id === item.id);
         if (product) {
           product.stock_actual = Math.max(0, getStock(product) - item.quantity);
         }
@@ -648,8 +812,11 @@ export async function hydratePosView() {
       isProcessingSale = false;
       confirmMixedBtn.disabled = false;
     } catch (error) {
-      console.error('Error Venta:', error);
-      showNotification(`ERROR AL COBRAR: ${error.error || error.message || 'Falla de red'}`, 'error');
+      console.error("Error Venta:", error);
+      showNotification(
+        `ERROR AL COBRAR: ${error.error || error.message || "Falla de red"}`,
+        "error",
+      );
       isProcessingSale = false;
       payButton.disabled = false;
       confirmMixedBtn.disabled = false;
@@ -657,45 +824,89 @@ export async function hydratePosView() {
     }
   }
 
-  clearCartBtn.addEventListener('click', () => {
+  clearCartBtn.addEventListener("click", () => {
     if (cart.length > 0) {
-      showConfirm('VACIAR VENTA', 'Se eliminarán todos los items cargados del ticket actual', () => {
-        cart = [];
-        updateCartUI();
-      });
+      showConfirm(
+        "VACIAR VENTA",
+        "Se eliminarán todos los items cargados del ticket actual",
+        () => {
+          cart = [];
+          updateCartUI();
+        },
+      );
     }
   });
 
-  closePaymentModalBtn.addEventListener('click', () => {
-    paymentModal.classList.add('hidden');
+  closePaymentModalBtn.addEventListener("click", () => {
+    paymentModal.classList.add("hidden");
     searchInput.focus();
   });
 
   // Atajos de teclado
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener("keydown", (e) => {
     // F2: Enfocar búsqueda
-    if (e.key === 'F2') {
+    if (e.key === "F2") {
       e.preventDefault();
       searchInput.focus();
       searchInput.select();
     }
     // ESC: Limpiar ticket
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       if (cart.length > 0) {
-        showConfirm('VACIAR TICKET', '¿Estás seguro de que deseas eliminar todos los productos?', () => {
-          cart = [];
-          updateCartUI();
-        });
+        showConfirm(
+          "VACIAR TICKET",
+          "¿Estás seguro de que deseas eliminar todos los productos?",
+          () => {
+            cart = [];
+            updateCartUI();
+          },
+        );
       }
     }
     // F1: Cobrar
-    if (e.key === 'F1') {
+    if (e.key === "F1") {
       e.preventDefault();
       if (cart.length > 0 && !payButton.disabled) {
         payButton.click();
       }
     }
   });
+
+  // Toggle imprimir ticket
+  const printToggleBtn = document.getElementById('print-toggle-btn');
+  let printTicketEnabled = localStorage.getItem('print_ticket') !== 'false';
+
+  function updatePrintToggle() {
+    if (!printToggleBtn) return;
+    printToggleBtn.textContent = printTicketEnabled ? 'ON' : 'OFF';
+    printToggleBtn.style.background = printTicketEnabled ? '#c47a2a' : '';
+    printToggleBtn.style.color = printTicketEnabled ? '#fff' : '';
+  }
+  if (printToggleBtn) {
+    printToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      printTicketEnabled = !printTicketEnabled;
+      localStorage.setItem('print_ticket', String(printTicketEnabled));
+      updatePrintToggle();
+    });
+  }
+  updatePrintToggle();
+
+  // Inicializar botones de ancho de papel
+  const savedPaper = localStorage.getItem('paper_width') || '80';
+  const btn50 = document.getElementById('paper-50-btn');
+  const btn80 = document.getElementById('paper-80-btn');
+
+  function setPaperWidth(mm) {
+    localStorage.setItem('paper_width', String(mm));
+    if (btn50) { btn50.style.background = mm === 50 ? '#c47a2a' : ''; btn50.style.color = mm === 50 ? '#fff' : ''; }
+    if (btn80) { btn80.style.background = mm === 80 ? '#c47a2a' : ''; btn80.style.color = mm === 80 ? '#fff' : ''; }
+  }
+
+  if (btn50) btn50.addEventListener('click', (e) => { e.stopPropagation(); setPaperWidth(50); });
+  if (btn80) btn80.addEventListener('click', (e) => { e.stopPropagation(); setPaperWidth(80); });
+
+  setPaperWidth(parseInt(savedPaper, 10));
 
   await loadData();
 }

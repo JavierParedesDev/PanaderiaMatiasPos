@@ -1,11 +1,11 @@
-import { getTurnos, cerrarTurno } from '../../services/shiftService.js';
+import { getTurnos, cerrarTurno, getResumenTurno } from '../../services/shiftService.js';
 import { getSession } from '../../state/sessionStore.js';
 import { formatCurrency, escapeHtml } from '../../utils/formatters.js';
 import { showNotification } from '../../utils/notifications.js';
 
 export function renderCajaSkeleton() {
   return `
-    <div class="px-10 py-10 space-y-8 pb-20">
+    <div class="h-full overflow-y-auto px-10 py-10 space-y-8 pb-20">
       <header class="flex items-center justify-between shrink-0">
         <div>
           <h1 class="text-3xl font-black text-[#2d221b] tracking-tighter">Mi Turno y Caja</h1>
@@ -16,7 +16,7 @@ export function renderCajaSkeleton() {
         </button>
       </header>
 
-      <div id="caja-content" class="grid gap-8 overflow-hidden">
+      <div id="caja-content" class="grid gap-8">
         <div class="panel h-64 animate-pulse bg-white/50 w-full"></div>
       </div>
     </div>
@@ -35,6 +35,17 @@ export function renderCajaSkeleton() {
               <span class="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-cafe/30">$</span>
               <input id="monto-arqueo" type="number" step="1" required class="field pl-12 text-3xl font-black text-cafe text-center h-20" placeholder="0">
             </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-4 border-t border-cafe/10 pt-4">
+              <div class="p-3 bg-papel rounded-xl text-center border border-cafe/5">
+                <span class="text-[9px] font-black text-cafe/40 uppercase tracking-widest">Esperado</span>
+                <p id="arqueo-esperado-modal" class="text-base font-black text-cafe mt-1">$0</p>
+              </div>
+              <div class="p-3 bg-papel rounded-xl text-center border border-cafe/5">
+                <span class="text-[9px] font-black text-cafe/40 uppercase tracking-widest">Diferencia</span>
+                <p id="arqueo-diferencia-modal" class="text-base font-black text-rojoaviso mt-1">$0</p>
+              </div>
+            </div>
           </div>
           
           <div class="space-y-4">
@@ -46,7 +57,7 @@ export function renderCajaSkeleton() {
 
           <div id="arqueo-message" class="hidden p-3 rounded-xl text-xs text-center font-bold"></div>
 
-          <button type="submit" id="btn-finalizar-cierre" class="btn-primary w-full py-5 text-base shadow-xl bg-rojoaviso hover:bg-rojoaviso/90">Finalizar Turno y Cerrar Caja</button>
+          <button type="submit" id="btn-finalizar-cierre" class="btn-primary w-full py-5 text-base shadow-xl bg-caramelo hover:bg-caramelo/90">Finalizar Turno y Cerrar Caja</button>
         </form>
       </div>
     </div>
@@ -123,8 +134,30 @@ export async function hydrateCajaView() {
             <button class="btn-primary px-10 py-4 shadow-xl shadow-cafe/20">Abrir Turno Ahora 🥐</button>
           </div>
         `;
+        const openModal = document.querySelector('#open-shift-modal');
+        if (openModal) {
+          openModal.classList.remove('hidden');
+          setTimeout(() => {
+            document.querySelector('#monto-apertura-caja')?.focus();
+          }, 200);
+        }
         return;
       }
+
+      let totalEfectivo = 0;
+      let totalTarjeta = 0;
+
+      try {
+        const resumenRes = await getResumenTurno(miTurno.id);
+        if (resumenRes.success && resumenRes.data) {
+          totalEfectivo = Number(resumenRes.data.total_efectivo) || 0;
+          totalTarjeta = Number(resumenRes.data.total_tarjeta) || 0;
+        }
+      } catch (e) {
+        console.error("Error al obtener resumen de turno:", e);
+      }
+
+      const totalEsperadoEfectivo = Number(miTurno.monto_apertura) + totalEfectivo;
 
       container.innerHTML = `
         <div class="grid gap-8 lg:grid-cols-2">
@@ -152,7 +185,7 @@ export async function hydrateCajaView() {
                 </div>
               </div>
 
-              <button id="btn-preparar-cierre" class="w-full btn-primary bg-rojoaviso hover:bg-rojoaviso/90 shadow-xl shadow-rojoaviso/10 py-5">
+              <button id="btn-preparar-cierre" class="w-full btn-primary bg-verdeok hover:bg-verdeok/90 shadow-xl shadow-verdeok/20 py-5 text-white font-bold">
                 Cerrar Turno Realizar Arqueo
               </button>
             </div>
@@ -164,21 +197,142 @@ export async function hydrateCajaView() {
             <div class="relative z-10 h-full flex flex-col">
               <h3 class="text-xl font-black uppercase tracking-tighter mb-8">Ventas de este Turno</h3>
               <div class="space-y-6 flex-1">
-                 <div class="flex items-end justify-between">
-                    <div>
-                      <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Venta Estimada</p>
-                      <p class="text-4xl font-black tracking-tighter">***</p>
+                 <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Efectivo</p>
+                       <p class="text-xl font-black tracking-tighter text-verdeok">${formatCurrency(totalEfectivo)}</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Tarjeta</p>
+                       <p class="text-xl font-black tracking-tighter text-white/80">${formatCurrency(totalTarjeta)}</p>
                     </div>
                  </div>
-                 <p class="text-xs text-white/50 leading-relaxed italic">Por seguridad, el total exacto se calcula al cerrar el turno y realizar la conciliación.</p>
+
+                 <div class="p-4 rounded-xl bg-white/10 border border-white/20 mt-4">
+                    <p class="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1">Total Efectivo a Rendir</p>
+                    <p class="text-3xl font-black tracking-tighter text-caramelo">${formatCurrency(totalEsperadoEfectivo)}</p>
+                 </div>
               </div>
             </div>
           </section>
         </div>
+        
+        <!-- Sección de Actualizaciones -->
+        <section class="panel p-6 bg-white border border-borde/20 shadow-md relative overflow-hidden mt-8 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <span class="text-3xl">📦</span>
+            <div>
+              <h3 class="text-sm font-black text-cafe uppercase tracking-widest">Actualizaciones del Sistema</h3>
+              <p class="text-xs text-cafe/50 font-medium">Revisa si hay nuevas versiones disponibles en el repositorio de GitHub.</p>
+            </div>
+          </div>
+          <button id="btn-actualizar-github" class="px-6 py-3 bg-cafe hover:bg-[#4a2f1d] text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-cafe/10 uppercase tracking-widest">
+            📥 Buscar en GitHub
+          </button>
+        </section>
+        <!-- Sección de Impresoras -->
+        <section class="panel p-6 bg-white border border-borde/20 shadow-md relative overflow-hidden mt-6 flex flex-col gap-4">
+          <div class="flex items-center gap-4">
+            <span class="text-3xl">🖨️</span>
+            <div>
+              <h3 class="text-sm font-black text-cafe uppercase tracking-widest">Impresora de Tickets</h3>
+              <p class="text-xs text-cafe/50 font-medium">Selecciona la impresora térmica predeterminada para el local.</p>
+            </div>
+          </div>
+          <div class="flex gap-4 items-center mt-2">
+            <select id="select-impresoras" class="w-full p-3 rounded-xl bg-papel/50 border border-borde/20 text-sm font-bold text-cafe focus:outline-none focus:ring-2 focus:ring-cafe/30">
+              <option value="">Detectando impresoras...</option>
+            </select>
+            <button id="btn-guardar-impresora" class="px-6 py-3 bg-verdeok hover:bg-verdeok/90 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-verdeok/10 uppercase tracking-widest">
+              💾 Guardar
+            </button>
+          </div>
+        </section>
       `;
+
+      const btnActualizar = document.querySelector('#btn-actualizar-github');
+      btnActualizar?.addEventListener('click', async () => {
+        if (window.electronAPI && window.electronAPI.checkForUpdates) {
+          btnActualizar.disabled = true;
+          btnActualizar.textContent = 'Buscando/Instalando...';
+          try {
+            const res = await window.electronAPI.checkForUpdates();
+            if (res.success) {
+              // showNotification puede no estar importado directamente, usemos alert o confirm temporalmente, o ver si existe en el scope
+              // En cajaView existe showNotification ya usado en la línea 337.
+              showNotification('¡Verificando actualizaciones en segundo plano!', 'success');
+            } else {
+              showNotification('Error: ' + res.error, 'error');
+              btnActualizar.disabled = false;
+              btnActualizar.textContent = '📥 Buscar en GitHub';
+            }
+          } catch (e) {
+             showNotification(e.message, 'error');
+             btnActualizar.disabled = false;
+             btnActualizar.textContent = '📥 Buscar en GitHub';
+          }
+        }
+      });
+
+      const selectImpresoras = document.querySelector('#select-impresoras');
+      const btnGuardarImpresora = document.querySelector('#btn-guardar-impresora');
+      const impresoraGuardada = localStorage.getItem('selected_printer') || '';
+
+      if (window.electronAPI && window.electronAPI.getPrinters) {
+        // Usar IIFE asíncrona para cargar impresoras
+        (async () => {
+          try {
+            const printers = await window.electronAPI.getPrinters();
+            selectImpresoras.innerHTML = '<option value="">-- Usar Predeterminada de Windows --</option>' + 
+              printers.map(p => `
+                <option value="${p.name}" ${p.name === impresoraGuardada ? 'selected' : ''}>${p.name}</option>
+              `).join('');
+          } catch (e) {
+            console.error("Error cargando impresoras:", e);
+            selectImpresoras.innerHTML = '<option value="">No se pudieron detectar impresoras</option>';
+          }
+        })();
+      }
+
+      btnGuardarImpresora?.addEventListener('click', () => {
+        const seleccionada = selectImpresoras.value;
+        localStorage.setItem('selected_printer', seleccionada);
+        showNotification('Impresora guardada correctamente.', 'success');
+      });
 
       document.querySelector('#btn-preparar-cierre')?.addEventListener('click', () => {
         messageBox?.classList.add('hidden');
+        
+        // Cargar valores iniciales en el modal
+        const modalEsperado = document.querySelector('#arqueo-esperado-modal');
+        const modalDiferencia = document.querySelector('#arqueo-diferencia-modal');
+        const inputMonto = document.querySelector('#monto-arqueo');
+        
+        if (modalEsperado) modalEsperado.textContent = formatCurrency(totalEsperadoEfectivo);
+        if (modalDiferencia) modalDiferencia.textContent = formatCurrency(-totalEsperadoEfectivo);
+        if (inputMonto) {
+          inputMonto.value = '';
+          inputMonto.focus();
+        }
+
+        // Listener para actualizar la diferencia en tiempo real
+        inputMonto?.addEventListener('input', () => {
+          const declarado = Number(inputMonto.value) || 0;
+          const diff = declarado - totalEsperadoEfectivo;
+          
+          if (modalDiferencia) {
+            modalDiferencia.textContent = formatCurrency(diff);
+            
+            if (diff === 0) {
+              modalDiferencia.className = "text-base font-black text-verdeok mt-1";
+            } else if (diff < 0) {
+              modalDiferencia.className = "text-base font-black text-rojoaviso mt-1";
+            } else {
+              modalDiferencia.className = "text-base font-black text-verdeok mt-1";
+            }
+          }
+        });
+
         arqueoModal.classList.remove('hidden');
       });
 
@@ -225,13 +379,15 @@ export async function hydrateCajaView() {
       messageBox.classList.remove('hidden');
 
       setTimeout(() => {
-        arqueoModal.classList.add('hidden');
-        arqueoForm.reset();
-        messageBox.classList.add('hidden');
-        btn.disabled = false;
-        btn.textContent = 'Finalizar Turno y Cerrar Caja';
-        loadStatus();
-      }, 2000);
+          arqueoModal.classList.add('hidden');
+          arqueoForm.reset();
+          messageBox.classList.add('hidden');
+          btn.disabled = false;
+          btn.textContent = 'Finalizar Turno y Cerrar Caja';
+          
+          const btnLogout = document.querySelector('#logout-button');
+          if (btnLogout) btnLogout.click();
+        }, 2000);
 
     } catch (error) {
       messageBox.textContent = error.message;
