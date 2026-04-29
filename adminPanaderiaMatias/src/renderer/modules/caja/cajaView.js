@@ -47,14 +47,14 @@ export async function hydrateCajaView() {
           <div class="space-y-4">
             ${activos.length ? activos.map(t => `
               <div class="p-5 rounded-2xl bg-papel/30 border border-borde/20 relative overflow-hidden group">
-                <div class="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">🟢</div>
+                <div class="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">ACTIVO</div>
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-xl bg-cafe text-white flex items-center justify-center font-bold shadow-md">
                     ${t.username.charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <p class="text-base font-black text-[#2d221b]">${escapeHtml(t.nombre_usuario)}</p>
-                    <p class="text-[10px] font-bold text-cafe/50 uppercase tracking-widest">${escapeHtml(t.nombre_sucursal)} • ${t.tipo_turno}</p>
+                    <p class="text-[10px] font-bold text-cafe/50 uppercase tracking-widest">${escapeHtml(t.nombre_sucursal)} - ${t.tipo_turno}</p>
                   </div>
                 </div>
                 <div class="mt-4 pt-4 border-t border-borde/10 grid grid-cols-2 gap-4">
@@ -77,11 +77,11 @@ export async function hydrateCajaView() {
         </section>
 
         ${isAdmin ? `
-        <!-- Auditoría de Cierres (Solo Admin) -->
+        <!-- Auditoria de Cierres (Solo Admin) -->
         <section class="panel p-6 bg-white shadow-sm border-t-4 border-t-cafe">
           <div class="flex items-center justify-between mb-8 border-b border-borde/30 pb-4">
-            <h2 class="text-xl font-black text-[#2d221b]">Auditoría de Cierres</h2>
-            <p class="text-[10px] font-bold text-cafe/40 uppercase">Últimos 10 cierres</p>
+            <h2 class="text-xl font-black text-[#2d221b]">Auditoria de Cierres</h2>
+            <p class="text-[10px] font-bold text-cafe/40 uppercase">Ultimos 10 cierres</p>
           </div>
 
           <div class="space-y-3">
@@ -92,7 +92,7 @@ export async function hydrateCajaView() {
                 <div class="flex items-center justify-between p-4 rounded-xl bg-papel/50 border border-borde/20">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-lg ${hasDiff ? 'bg-rojoaviso' : 'bg-verdeok'} text-white flex items-center justify-center text-xs">
-                      ${hasDiff ? '⚠️' : '✅'}
+                      ${hasDiff ? '!' : 'OK'}
                     </div>
                     <div>
                       <p class="text-sm font-bold text-[#2d221b]">${escapeHtml(t.username)}</p>

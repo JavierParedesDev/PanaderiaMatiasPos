@@ -1,20 +1,15 @@
 const pool = require('../config/db');
 
 /**
- * Obtener todos los turnos con filtros para administración
+ * Obtener todos los turnos con filtros para administracion
  */
 const getTurnos = async (req, res) => {
-    const { estado, sucursal } = req.query;
+    const { estado } = req.query;
     try {
         let query = `
             SELECT 
-                t.*, 
-                u.nombre_completo as nombre_usuario, 
-                u.username,
-                s.nombre as nombre_sucursal
+                t.*
             FROM turnos_caja t
-            JOIN usuarios u ON t.id_usuario = u.id
-            JOIN sucursales s ON t.id_sucursal = s.id
             WHERE 1=1
         `;
         const params = [];
@@ -24,15 +19,63 @@ const getTurnos = async (req, res) => {
             query += ` AND t.estado = $${params.length}`;
         }
 
-        if (sucursal) {
-            params.push(sucursal);
-            query += ` AND s.nombre = $${params.length}`;
-        }
-
         query += ` ORDER BY t.fecha_apertura DESC LIMIT 50`;
 
         const result = await pool.query(query, params);
-        res.json({ success: true, data: result.rows });
+        const turnos = result.rows;
+
+        const usuariosIds = [...new Set(turnos.map((turno) => turno.id_usuario).filter(Boolean))];
+        const sucursalesIds = [...new Set(turnos.map((turno) => turno.id_sucursal).filter(Boolean))];
+        const usuarios = new Map();
+        const sucursales = new Map();
+
+        if (usuariosIds.length) {
+            try {
+                const usuariosResult = await pool.query(
+                    `SELECT id, nombre_completo, username
+                     FROM usuarios
+                     WHERE id = ANY($1)`,
+                    [usuariosIds]
+                );
+
+                usuariosResult.rows.forEach((usuario) => {
+                    usuarios.set(Number(usuario.id), usuario);
+                });
+            } catch (userError) {
+                console.error('Error al cargar usuarios para turnos:', userError);
+            }
+        }
+
+        if (sucursalesIds.length) {
+            try {
+                const sucursalesResult = await pool.query(
+                    `SELECT id, nombre
+                     FROM sucursales
+                     WHERE id = ANY($1)`,
+                    [sucursalesIds]
+                );
+
+                sucursalesResult.rows.forEach((sucursalItem) => {
+                    sucursales.set(Number(sucursalItem.id), sucursalItem);
+                });
+            } catch (branchError) {
+                console.error('Error al cargar sucursales para turnos:', branchError);
+            }
+        }
+
+        const data = turnos.map((turno) => {
+            const usuario = usuarios.get(Number(turno.id_usuario));
+            const sucursalItem = sucursales.get(Number(turno.id_sucursal));
+
+            return {
+                ...turno,
+                nombre_usuario: usuario?.nombre_completo || usuario?.username || `Usuario ${turno.id_usuario || ''}`.trim(),
+                username: usuario?.username || `usuario_${turno.id_usuario || ''}`.trim(),
+                nombre_sucursal: sucursalItem?.nombre || `Sucursal ${turno.id_sucursal || ''}`.trim()
+            };
+        });
+
+        res.json({ success: true, data });
     } catch (error) {
         console.error('Error al obtener turnos:', error);
         res.status(500).json({ success: false, error: 'Error al obtener la lista de turnos.' });

@@ -6,6 +6,10 @@ const resolveSucursalId = (req) => {
         return requested;
     }
 
+    if (req.usuario?.rol === 'Admin') {
+        return null;
+    }
+
     return req.usuario.id_sucursal;
 };
 
@@ -74,7 +78,7 @@ const getHistorialVentas = async (req, res) => {
             FROM ventas_cabecera vc
             JOIN usuarios u ON vc.id_usuario = u.id
             JOIN sucursales s ON vc.id_sucursal = s.id
-            WHERE vc.id_sucursal = $1
+            WHERE ($1::int IS NULL OR vc.id_sucursal = $1)
             ORDER BY vc.fecha DESC
             LIMIT 100
         `;

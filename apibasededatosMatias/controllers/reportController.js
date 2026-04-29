@@ -6,6 +6,10 @@ const resolveSucursalId = (req) => {
         return requested;
     }
 
+    if (req.usuario?.rol === 'Admin') {
+        return null;
+    }
+
     return req.usuario.id_sucursal;
 };
 
@@ -24,8 +28,9 @@ const reporteCigarrosHoy = async (req, res) => {
             JOIN productos p ON vd.id_producto = p.id
             JOIN categorias c ON p.id_categoria = c.id
             WHERE c.nombre = 'Cigarros'
-              AND DATE(vc.fecha) = CURRENT_DATE
-              AND vc.id_sucursal = $1
+              AND vc.fecha >= CURRENT_DATE
+              AND vc.fecha < CURRENT_DATE + INTERVAL '1 day'
+              AND ($1::int IS NULL OR vc.id_sucursal = $1)
             GROUP BY p.nombre
         `,
             [id_sucursal]
@@ -47,7 +52,9 @@ const getDashboard = async (req, res) => {
             `
             SELECT COALESCE(SUM(total_venta), 0) as total, COUNT(*) as transacciones
             FROM ventas_cabecera
-            WHERE DATE(fecha) = CURRENT_DATE AND id_sucursal = $1
+            WHERE fecha >= CURRENT_DATE
+              AND fecha < CURRENT_DATE + INTERVAL '1 day'
+              AND ($1::int IS NULL OR id_sucursal = $1)
         `,
             [id_sucursal]
         );
@@ -57,7 +64,9 @@ const getDashboard = async (req, res) => {
             FROM ventas_detalle vd
             JOIN ventas_cabecera vc ON vd.id_venta = vc.id
             JOIN productos p ON vd.id_producto = p.id
-            WHERE DATE(vc.fecha) = CURRENT_DATE AND vc.id_sucursal = $1
+            WHERE vc.fecha >= CURRENT_DATE
+              AND vc.fecha < CURRENT_DATE + INTERVAL '1 day'
+              AND ($1::int IS NULL OR vc.id_sucursal = $1)
         `,
             [id_sucursal]
         );
@@ -66,7 +75,8 @@ const getDashboard = async (req, res) => {
             SELECT p.nombre, i.stock_actual, i.stock_minimo, p.unidad
             FROM inventarios i
             JOIN productos p ON i.id_producto = p.id
-            WHERE i.id_sucursal = $1 AND i.stock_actual <= i.stock_minimo
+            WHERE ($1::int IS NULL OR i.id_sucursal = $1)
+              AND i.stock_actual <= i.stock_minimo
             ORDER BY i.stock_actual ASC, p.nombre ASC
             LIMIT 5
         `,
@@ -76,7 +86,8 @@ const getDashboard = async (req, res) => {
             `
             SELECT COUNT(*) as cantidad
             FROM inventarios
-            WHERE id_sucursal = $1 AND stock_actual <= stock_minimo
+            WHERE ($1::int IS NULL OR id_sucursal = $1)
+              AND stock_actual <= stock_minimo
         `,
             [id_sucursal]
         );
@@ -84,7 +95,7 @@ const getDashboard = async (req, res) => {
             `
             SELECT id, total_venta, fecha, id_usuario
             FROM ventas_cabecera
-            WHERE id_sucursal = $1
+            WHERE ($1::int IS NULL OR id_sucursal = $1)
             ORDER BY fecha DESC
             LIMIT 5
         `,
@@ -94,7 +105,8 @@ const getDashboard = async (req, res) => {
             `
             SELECT DATE(fecha) as dia, SUM(total_venta) as total
             FROM ventas_cabecera
-            WHERE fecha >= CURRENT_DATE - INTERVAL '6 days' AND id_sucursal = $1
+            WHERE fecha >= CURRENT_DATE - INTERVAL '6 days'
+              AND ($1::int IS NULL OR id_sucursal = $1)
             GROUP BY DATE(fecha)
             ORDER BY dia ASC
         `,
@@ -136,7 +148,7 @@ const getRankingProductos = async (req, res) => {
             FROM ventas_detalle vd
             JOIN ventas_cabecera vc ON vd.id_venta = vc.id
             JOIN productos p ON vd.id_producto = p.id
-            WHERE vc.id_sucursal = $1
+            WHERE ($1::int IS NULL OR vc.id_sucursal = $1)
             GROUP BY p.nombre
             ORDER BY total_unidades DESC
             LIMIT 10
@@ -163,7 +175,7 @@ const getReporteUtilidadMensual = async (req, res) => {
             FROM ventas_cabecera vc
             JOIN ventas_detalle vd ON vc.id = vd.id_venta
             JOIN productos p ON vd.id_producto = p.id
-            WHERE vc.id_sucursal = $1
+            WHERE ($1::int IS NULL OR vc.id_sucursal = $1)
             GROUP BY TO_CHAR(vc.fecha, 'YYYY-MM')
             ORDER BY mes DESC
             LIMIT 6

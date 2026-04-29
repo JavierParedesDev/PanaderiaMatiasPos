@@ -25,6 +25,10 @@ export async function ingresarFactura(datos) {
   return apiClient.post('/facturas', datos);
 }
 
+export async function getFacturasIngreso(params = {}) {
+  return apiClient.get(`/facturas${buildQuery(params)}`);
+}
+
 export async function registrarMerma(datos) {
   return apiClient.post('/mermas', datos);
 }

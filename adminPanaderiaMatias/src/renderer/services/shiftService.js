@@ -2,7 +2,7 @@ import { apiClient } from './apiClient.js';
 
 export async function getTurnos(filtros = {}) {
     const query = new URLSearchParams(filtros).toString();
-    return apiClient.get(`/turnos?${query}`);
+    return apiClient.get(query ? `/turnos?${query}` : '/turnos');
 }
 
 export async function abrirTurno(datos) {

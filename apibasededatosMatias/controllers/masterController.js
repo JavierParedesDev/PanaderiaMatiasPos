@@ -32,13 +32,26 @@ const crearCategoria = async (req, res) => {
 const crearProveedor = async (req, res) => {
     if (req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Solo Admin' });
     const { rut_proveedor, nombre_empresa, contacto_nombre, telefono } = req.body;
+
+    if (!nombre_empresa || !String(nombre_empresa).trim()) {
+        return res.status(400).json({ success: false, error: 'Debe indicar el nombre del proveedor.' });
+    }
+
     try {
         const result = await pool.query(
             'INSERT INTO proveedores (rut_proveedor, nombre_empresa, contacto_nombre, telefono) VALUES ($1, $2, $3, $4) RETURNING *', 
-            [rut_proveedor, nombre_empresa, contacto_nombre, telefono]
+            [
+                rut_proveedor || null,
+                String(nombre_empresa).trim(),
+                contacto_nombre || null,
+                telefono || null
+            ]
         );
         res.json({ success: true, data: result.rows[0] });
-    } catch (error) { res.status(500).json({ error: 'Error al crear proveedor.' }); }
+    } catch (error) {
+        const status = error.code === '23505' ? 400 : 500;
+        res.status(status).json({ success: false, error: error.detail || error.message || 'Error al crear proveedor.' });
+    }
 };
 
 module.exports = { getCategorias, getProveedores, getSucursales, getMetodosPago, crearCategoria, crearProveedor };

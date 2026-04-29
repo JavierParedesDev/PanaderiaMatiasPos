@@ -5,6 +5,7 @@ const SCALES_STORAGE_KEY = 'panaderia_matias_balanzas';
 const DEFAULT_SCALES = [
   { id: 'digi-sm120-239', nombre: 'DIGI SM-120LL', ip: '192.168.1.239', puerto: 2239, activa: true }
 ];
+const BALANZA_UNDER_CONSTRUCTION = true;
 
 let productosCache = [];
 let balanzasCache = [];
@@ -17,6 +18,20 @@ let directFormat = 'digi-f1-25';
 const ITEMS_PER_PAGE = 50;
 
 export function renderBalanzaSkeleton() {
+  if (BALANZA_UNDER_CONSTRUCTION) {
+    return `
+      <div class="min-h-[62vh] flex items-center justify-center">
+        <section class="panel max-w-2xl bg-white p-10 text-center">
+          <p class="text-[11px] font-black uppercase tracking-[0.24em] text-cafe/40">Modulo en pausa</p>
+          <h1 class="mt-3 text-3xl font-black text-[#2d221b]">Balanza en construccion</h1>
+          <p class="mt-4 text-sm leading-6 text-[#705f52]">
+            Estamos trabajando en la integracion con la balanza DIGI. Esta seccion quedara disponible cuando el envio de PLU este validado por completo.
+          </p>
+        </section>
+      </div>
+    `;
+  }
+
   return `
     <div class="space-y-6">
       <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -763,6 +778,8 @@ async function importLabelNetCsv(file) {
 }
 
 export async function hydrateBalanzaView() {
+  if (BALANZA_UNDER_CONSTRUCTION) return;
+
   balanzasCache = loadScales();
   selectedScaleId = balanzasCache[0]?.id || '';
 

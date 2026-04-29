@@ -1,5 +1,22 @@
-import { getCategorias, getProveedores, getSucursales, getMetodosPago } from '../../services/masterService.js';
+import { crearCategoria, crearProveedor, getCategorias, getProveedores, getSucursales, getMetodosPago } from '../../services/masterService.js';
 import { escapeHtml } from '../../utils/formatters.js';
+
+function renderMessage(id) {
+  return `<div id="${id}" class="hidden rounded-xl border px-4 py-3 text-sm font-bold"></div>`;
+}
+
+function showMessage(id, tone, message) {
+  const box = document.querySelector(`#${id}`);
+  if (!box) return;
+
+  box.textContent = message;
+  box.className = 'rounded-xl border px-4 py-3 text-sm font-bold';
+  if (tone === 'success') {
+    box.classList.add('border-[#c5dfcb]', 'bg-[#eef8f0]', 'text-verdeok');
+  } else {
+    box.classList.add('border-[#efc1bb]', 'bg-[#fff4f2]', 'text-rojoaviso');
+  }
+}
 
 export function renderMaestrosSkeleton() {
     return `
@@ -36,8 +53,12 @@ export async function hydrateMaestrosView() {
       <section class="panel bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between mb-4 border-b border-borde/20 pb-3">
           <h2 class="text-lg font-black text-[#2d221b]">Categorías</h2>
-          <button class="text-[10px] font-bold text-azulaviso">+ NUEVA</button>
         </div>
+        <form id="form-categoria" class="mb-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <input name="nombre" class="field h-10 text-sm" placeholder="Nueva categoria" required>
+          <button type="submit" class="btn-secondary h-10 px-4 py-2 text-xs">Agregar</button>
+        </form>
+        ${renderMessage('categoria-message')}
         <div class="space-y-2">
           ${catRes.data.map(c => `
             <div class="flex items-center justify-between p-2 rounded-lg hover:bg-papel/20">
@@ -52,13 +73,22 @@ export async function hydrateMaestrosView() {
       <section class="panel bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between mb-4 border-b border-borde/20 pb-3">
           <h2 class="text-lg font-black text-[#2d221b]">Proveedores</h2>
-          <button class="text-[10px] font-bold text-azulaviso">+ NUEVA</button>
         </div>
+        <form id="form-proveedor" class="mb-4 space-y-3">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <input name="nombre_empresa" class="field h-10 text-sm" placeholder="Nombre proveedor" required>
+            <input name="rut_proveedor" class="field h-10 text-sm" placeholder="RUT proveedor">
+            <input name="contacto_nombre" class="field h-10 text-sm" placeholder="Contacto">
+            <input name="telefono" class="field h-10 text-sm" placeholder="Telefono">
+          </div>
+          <button type="submit" class="btn-secondary h-10 px-4 py-2 text-xs">Agregar proveedor</button>
+        </form>
+        ${renderMessage('proveedor-message')}
         <div class="space-y-2">
           ${provRes.data.map(p => `
             <div class="flex items-center justify-between p-2 rounded-lg hover:bg-papel/20">
-              <span class="text-sm font-bold text-cafe">${escapeHtml(p.nombre)}</span>
-              <span class="text-[10px] text-cafe/30">RUT: ${p.rut || 'N/A'}</span>
+              <span class="text-sm font-bold text-cafe">${escapeHtml(p.nombre_empresa || '')}</span>
+              <span class="text-[10px] text-cafe/30">RUT: ${escapeHtml(p.rut_proveedor || 'N/A')}</span>
             </div>
           `).join('')}
         </div>
@@ -94,6 +124,62 @@ export async function hydrateMaestrosView() {
         </div>
       </section>
     `;
+
+        document.querySelector('#form-categoria')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const button = form.querySelector('button[type="submit"]');
+            const nombre = new FormData(form).get('nombre')?.trim();
+
+            if (!nombre) {
+                showMessage('categoria-message', 'error', 'Ingresa un nombre de categoria.');
+                return;
+            }
+
+            try {
+                button.disabled = true;
+                button.textContent = 'Guardando...';
+                await crearCategoria({ nombre });
+                showMessage('categoria-message', 'success', 'Categoria agregada.');
+                await hydrateMaestrosView();
+            } catch (error) {
+                showMessage('categoria-message', 'error', error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Agregar';
+            }
+        });
+
+        document.querySelector('#form-proveedor')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const button = form.querySelector('button[type="submit"]');
+            const data = Object.fromEntries(new FormData(form).entries());
+            const payload = {
+                nombre_empresa: data.nombre_empresa?.trim(),
+                rut_proveedor: data.rut_proveedor?.trim() || null,
+                contacto_nombre: data.contacto_nombre?.trim() || null,
+                telefono: data.telefono?.trim() || null
+            };
+
+            if (!payload.nombre_empresa) {
+                showMessage('proveedor-message', 'error', 'Ingresa el nombre del proveedor.');
+                return;
+            }
+
+            try {
+                button.disabled = true;
+                button.textContent = 'Guardando...';
+                await crearProveedor(payload);
+                showMessage('proveedor-message', 'success', 'Proveedor agregado.');
+                await hydrateMaestrosView();
+            } catch (error) {
+                showMessage('proveedor-message', 'error', error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Agregar proveedor';
+            }
+        });
     } catch (error) {
         container.innerHTML = `<div class="col-span-2 panel p-8 text-center text-rojoaviso font-bold bg-white">${error.message}</div>`;
     }

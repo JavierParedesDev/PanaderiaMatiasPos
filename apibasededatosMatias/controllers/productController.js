@@ -74,8 +74,8 @@ const getProductos = async (req, res) => {
                 COALESCE(i.stock_minimo, 0) as stock_minimo,
                 (p.precio_venta - p.precio_costo) as utilidad_pesos,
                 CASE
-                    WHEN p.precio_costo > 0
-                    THEN ROUND(((p.precio_venta - p.precio_costo) / p.precio_costo) * 100, 2)
+                    WHEN p.precio_venta > 0
+                    THEN ROUND(((p.precio_venta - p.precio_costo) / p.precio_venta) * 100, 2)
                     ELSE 0
                 END as margen_porcentaje
             FROM productos p
