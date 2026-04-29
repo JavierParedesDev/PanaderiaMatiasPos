@@ -1,7 +1,15 @@
 import { getCategorias } from '../../services/masterService.js';
-import { actualizarProducto, crearProducto, getProductos, eliminarProducto } from '../../services/productService.js';
+import { actualizarProducto, crearProducto, eliminarProducto, exportarProductosLabelNet, getProductos } from '../../services/productService.js';
 import { escapeHtml, formatCurrency } from '../../utils/formatters.js';
 import { getSession } from '../../state/sessionStore.js';
+
+let productosCache = [];
+let categoriasCache = [];
+let currentPage = 1;
+let searchQuery = '';
+let editingProductId = null;
+
+const ITEMS_PER_PAGE = 15;
 
 export function renderProductosSkeleton() {
   const isAdmin = getSession()?.usuario?.rol === 'Admin';
@@ -11,24 +19,28 @@ export function renderProductosSkeleton() {
       <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 class="text-3xl font-bold text-[#2d221b]">Productos</h1>
-          <p class="text-sm text-[#705f52] mt-1">Consulta el catálogo de panadería y pastelería.</p>
+          <p class="text-sm text-[#705f52] mt-1">Administra el catalogo y los datos para LabelNet.</p>
         </div>
         ${isAdmin ? `
-        <button id="abrir-modal-nuevo" class="btn-primary">
-          <span class="mr-2">+</span> Agregar Producto
-        </button>` : ''}
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <button id="exportar-labelnet" class="btn-secondary">Exportar LabelNet</button>
+            <input id="balanza-ip" class="field h-11 sm:w-36" value="192.168.1.239" aria-label="IP balanza">
+            <input id="balanza-puerto" class="field h-11 sm:w-24" value="20304" inputmode="numeric" aria-label="Puerto balanza">
+            <button id="actualizar-plu-balanza" class="btn-secondary">Actualizar PLU Balanza</button>
+            <button id="abrir-modal-nuevo" class="btn-primary"><span class="mr-2">+</span>Agregar Producto</button>
+          </div>
+        ` : ''}
       </header>
 
-      <!-- Barra de progreso / carga -->
       <div id="productos-progress-container" class="hidden h-1.5 w-full overflow-hidden rounded-full bg-cafe/10">
         <div id="productos-progress-bar" class="h-full bg-cafe transition-all duration-300" style="width: 0%"></div>
       </div>
 
       <div class="panel bg-white p-6">
+        <div id="productos-page-message" class="hidden mb-4 rounded-xl px-4 py-3 text-sm"></div>
         <div class="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between font-medium">
           <div class="relative w-full md:w-96">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-cafe/40 text-lg">🔍</span>
-            <input id="buscador-productos" type="text" class="field pl-12 h-11" placeholder="Buscar por nombre o código...">
+            <input id="buscador-productos" type="text" class="field h-11" placeholder="Buscar por nombre o codigo...">
           </div>
           <div class="flex items-center gap-2 text-sm text-[#705f52]">
             <span id="total-productos-count">0</span> productos encontrados
@@ -43,49 +55,51 @@ export function renderProductosSkeleton() {
           </div>
         </div>
 
-        <!-- Paginación -->
         <div class="mt-8 flex items-center justify-center gap-4">
           <button id="prev-page" class="btn-secondary py-2 px-4 text-xs disabled:opacity-30 disabled:cursor-not-allowed">Anterior</button>
-          <span id="page-info" class="text-sm font-semibold text-cafe">Página 1 de 1</span>
+          <span id="page-info" class="text-sm font-semibold text-cafe">Pagina 1 de 1</span>
           <button id="next-page" class="btn-secondary py-2 px-4 text-xs disabled:opacity-30 disabled:cursor-not-allowed">Siguiente</button>
         </div>
       </div>
 
-      <!-- Modal para Agregar/Editar -->
-      <div id="producto-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-tinta/40 backdrop-blur-sm transition-opacity">
-        <div class="panel w-full max-w-2xl bg-papel shadow-2xl overflow-hidden scale-95 transition-transform">
-          <div class="p-6 border-b border-borde/40 flex items-center justify-between">
+      <div id="producto-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-tinta/40 backdrop-blur-sm">
+        <div class="panel w-full max-w-3xl max-h-[90vh] bg-papel shadow-2xl overflow-hidden flex flex-col">
+          <div class="p-6 border-b border-borde/40 flex items-center justify-between shrink-0">
             <h2 id="producto-modal-title" class="text-xl font-bold text-[#2d221b]">Nuevo Producto</h2>
             <button id="cerrar-modal" class="text-cafe/60 hover:text-cafe text-2xl font-light">&times;</button>
           </div>
-          <form id="producto-form" class="p-8 space-y-5">
+          <form id="producto-form" class="flex-1 overflow-y-auto p-8 space-y-5">
             <input id="producto-id" type="hidden">
+
             <div class="grid gap-5 md:grid-cols-2">
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Código Interno</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Codigo Interno</label>
                 <input id="producto-codigo-interno" class="field" placeholder="Ej: 01476">
               </div>
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Código Externo</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Codigo Externo</label>
                 <input id="producto-codigo-externo" class="field" placeholder="Ej: 7804612345678">
               </div>
             </div>
+
             <div>
               <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Nombre del Producto</label>
               <input id="producto-nombre" class="field" placeholder="Ej: Pan Batido Especial">
             </div>
+
             <div class="grid gap-5 md:grid-cols-2">
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Unidad</label>
                 <input id="producto-unidad" class="field" placeholder="UN/KG">
               </div>
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Categoría</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Categoria</label>
                 <select id="producto-categoria" class="field">
                   <option value="">Cargando...</option>
                 </select>
               </div>
             </div>
+
             <div class="grid gap-5 md:grid-cols-3">
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Precio Costo</label>
@@ -96,50 +110,84 @@ export function renderProductosSkeleton() {
                 <input id="producto-precio" type="number" step="0.01" class="field" placeholder="0.00">
               </div>
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Impuesto Específico (%)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Impuesto Especifico (%)</label>
                 <input id="producto-impuesto" type="number" step="0.01" class="field" placeholder="0.00">
               </div>
             </div>
 
-            <!-- Pesable Toggle -->
             <div class="flex items-center justify-between p-4 rounded-2xl bg-crema/30 border border-borde/30">
               <div>
-                <p class="text-sm font-black text-[#2d221b]">⚖️ Producto Pesable</p>
+                <p class="text-sm font-black text-[#2d221b]">Producto Pesable</p>
                 <p class="text-[10px] text-cafe/50 mt-0.5">Se vende por peso (kg/gramos), no por unidad.</p>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input id="producto-pesable" type="checkbox" class="sr-only peer">
-                <div class="w-11 h-6 bg-cafe/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cafe"></div>
+                <div class="w-11 h-6 bg-cafe/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cafe"></div>
                 <span class="ml-3 text-xs font-bold text-cafe/60 peer-has-[:checked]:text-cafe" id="pesable-label">No pesable</span>
               </label>
             </div>
 
+            <div class="grid gap-5 md:grid-cols-3">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">PLU Balanza</label>
+                <input id="producto-plu-balanza" type="number" min="1" class="field" placeholder="Ej: 123">
+              </div>
+              <div class="md:col-span-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Nombre Etiqueta</label>
+                <input id="producto-nombre-etiqueta" class="field" placeholder="Ej: PAN CORRIENTE">
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between p-4 rounded-2xl bg-papel/60 border border-borde/30">
+              <div>
+                <p class="text-sm font-black text-[#2d221b]">Enviar a LabelNet</p>
+                <p class="text-[10px] text-cafe/50 mt-0.5">Incluye este producto en la exportacion para la balanza.</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input id="producto-activo-balanza" type="checkbox" class="sr-only peer">
+                <div class="w-11 h-6 bg-cafe/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cafe"></div>
+                <span class="ml-3 text-xs font-bold text-cafe/60 peer-has-[:checked]:text-cafe" id="balanza-label">No exportar</span>
+              </label>
+            </div>
+
             <div id="producto-form-message" class="hidden rounded-xl px-4 py-3 text-sm text-center"></div>
-            <div class="pt-4 flex gap-3 justify-end border-t border-borde/40">
+            <div class="sticky bottom-0 bg-papel pt-4 flex gap-3 justify-end border-t border-borde/40">
               <button id="cancelar-modal" type="button" class="btn-secondary px-8">Cancelar</button>
               <button id="producto-submit" type="submit" class="btn-primary px-10 font-bold">Guardar Producto</button>
             </div>
           </form>
         </div>
       </div>
-      <!-- Modal de Confirmación Personalizado -->
-      <div id="confirm-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-tinta/60 backdrop-blur-md transition-opacity">
-        <div class="panel w-full max-w-md bg-crema shadow-2xl overflow-hidden scale-95 transition-transform border-2 border-cafe/20">
-          <div class="p-8 text-center space-y-4">
-            <div class="w-16 h-16 bg-rojoaviso/10 text-rojoaviso rounded-full flex items-center justify-center mx-auto text-3xl mb-2">
-              ⚠️
-            </div>
-            <h2 id="confirm-modal-title" class="text-xl font-bold text-[#2d221b]">¿Estás seguro?</h2>
-            <p id="confirm-modal-message" class="text-[#705f52]">Esta acción no se puede deshacer.</p>
-            <div class="pt-6 flex gap-3 justify-center">
-              <button id="confirm-cancel" type="button" class="btn-secondary px-6">Cancelar</button>
-              <button id="confirm-accept" type="button" class="btn-primary bg-rojoaviso hover:bg-[#b03020] px-8 border-none ring-offset-crema">Confirmar</button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   `;
+}
+
+function showProgress(show) {
+  const pContainer = document.querySelector('#productos-progress-container');
+  const pBar = document.querySelector('#productos-progress-bar');
+  if (!pContainer || !pBar) return;
+
+  if (show) {
+    pContainer.classList.remove('hidden');
+    pBar.style.width = '30%';
+    setTimeout(() => { pBar.style.width = '90%'; }, 150);
+  } else {
+    pBar.style.width = '100%';
+    setTimeout(() => pContainer.classList.add('hidden'), 300);
+  }
+}
+
+function showMessage(element, tone, text) {
+  if (!element) return;
+
+  element.textContent = text;
+  element.className = 'rounded-xl px-4 py-3 text-sm border';
+
+  if (tone === 'error') {
+    element.classList.add('border-[#efc1bb]', 'bg-[#fff4f2]', 'text-rojoaviso');
+  } else {
+    element.classList.add('border-[#c5dfcb]', 'bg-[#eef8f0]', 'text-verdeok');
+  }
 }
 
 function renderProductosTable(productos = []) {
@@ -158,13 +206,15 @@ function renderProductosTable(productos = []) {
       <table class="min-w-full text-sm">
         <thead class="bg-crema/30">
           <tr class="text-left text-[#6a584b] uppercase tracking-tighter text-[10px] font-black opacity-60">
-            <th class="px-4 py-4">Códigos</th>
+            <th class="px-4 py-4">Codigos</th>
             <th class="px-4 py-4">Producto</th>
-            <th class="px-4 py-4">Categoría</th>
+            <th class="px-4 py-4">Categoria</th>
             ${isAdmin ? '<th class="px-4 py-4">Costo</th>' : ''}
             <th class="px-4 py-4">P. Venta</th>
+            ${isAdmin ? '<th class="px-4 py-4 text-center">PLU</th>' : ''}
             ${isAdmin ? '<th class="px-4 py-4 text-center">Margen</th>' : ''}
-            <th class="px-4 py-4 text-center">⚖️ Pesable</th>
+            <th class="px-4 py-4 text-center">Pesable</th>
+            ${isAdmin ? '<th class="px-4 py-4 text-center">LabelNet</th>' : ''}
             <th class="px-4 py-4 text-center">Activo</th>
             ${isAdmin ? '<th class="px-4 py-4 text-right">Acciones</th>' : ''}
           </tr>
@@ -176,41 +226,43 @@ function renderProductosTable(productos = []) {
                 <p class="font-mono text-[11px] text-cafe">IN: ${escapeHtml(producto.codigo_interno || '-')}</p>
                 <p class="font-mono text-[10px] text-cafe/40">EX: ${escapeHtml(producto.codigo_barra_externo || '-')}</p>
               </td>
-              <td class="px-4 py-4 font-bold text-[#2d221b]">${escapeHtml(producto.nombre)}</td>
+              <td class="px-4 py-4">
+                <p class="font-bold text-[#2d221b]">${escapeHtml(producto.nombre)}</p>
+                ${producto.nombre_etiqueta ? `<p class="text-[10px] text-cafe/40">ETQ: ${escapeHtml(producto.nombre_etiqueta)}</p>` : ''}
+              </td>
               <td class="px-4 py-4 text-xs text-cafe/70">${escapeHtml(producto.categoria || '-')}</td>
               ${isAdmin ? `<td class="px-4 py-4 text-cafe/60 font-medium">${formatCurrency(producto.precio_costo)}</td>` : ''}
               <td class="px-4 py-4 font-black text-cafe">${formatCurrency(producto.precio_venta)}</td>
+              ${isAdmin ? `<td class="px-4 py-4 text-center font-mono text-xs text-cafe">${escapeHtml(producto.plu_balanza || '-')}</td>` : ''}
               ${isAdmin ? `
+                <td class="px-4 py-4 text-center">
+                  <span class="badge ${producto.margen_porcentaje > 30 ? 'bg-verdeok/10 text-verdeok' : 'bg-caramelo/10 text-caramelo'}">
+                    ${producto.margen_porcentaje}%
+                  </span>
+                </td>` : ''}
               <td class="px-4 py-4 text-center">
-                <span class="badge ${producto.margen_porcentaje > 30 ? 'bg-verdeok/10 text-verdeok' : 'bg-caramelo/10 text-caramelo'}">
-                  ${producto.margen_porcentaje}%
-                </span>
-              </td>` : ''}
-              <td class="px-4 py-4 text-center">
-                ${producto.pesable
-      ? '<span class="badge bg-azulaviso/10 text-azulaviso font-black">⚖️ Sí</span>'
-      : '<span class="text-cafe/20 text-xs">—</span>'}
+                ${producto.pesable ? '<span class="badge bg-azulaviso/10 text-azulaviso font-black">SI</span>' : '<span class="text-cafe/20 text-xs">-</span>'}
               </td>
+              ${isAdmin ? `
+                <td class="px-4 py-4 text-center">
+                  ${producto.activo_balanza ? '<span class="badge bg-verdeok/10 text-verdeok font-black">ACTIVO</span>' : '<span class="text-cafe/20 text-xs">-</span>'}
+                </td>` : ''}
               <td class="px-4 py-4 text-center">
-                <button type="button" class="switch focus:ring-verdeok/30 ${!isAdmin ? 'pointer-events-none' : ''}" 
-                        role="switch" 
-                        aria-checked="${producto.activo ? 'true' : 'false'}" 
-                        data-action="${isAdmin ? 'toggle-status' : 'none'}" 
+                <button type="button" class="switch focus:ring-verdeok/30 ${!isAdmin ? 'pointer-events-none' : ''}"
+                        role="switch"
+                        aria-checked="${producto.activo ? 'true' : 'false'}"
+                        data-action="${isAdmin ? 'toggle-status' : 'none'}"
                         data-id="${escapeHtml(producto.id)}">
                   <span class="switch-thumb"></span>
                 </button>
               </td>
               ${isAdmin ? `
-              <td class="px-4 py-4 text-right">
-                <div class="flex justify-end gap-2">
-                  <button class="w-8 h-8 rounded-lg bg-cafe text-white flex items-center justify-center hover:bg-[#4a2f1d] transition-colors" data-action="editar-producto" data-id="${escapeHtml(producto.id)}" title="Editar">
-                    ✏️
-                  </button>
-                  <button class="w-8 h-8 rounded-lg bg-rojoaviso/10 text-rojoaviso hover:bg-rojoaviso hover:text-white flex items-center justify-center transition-all" data-action="eliminar-producto" data-id="${escapeHtml(producto.id)}" title="Eliminar">
-                    🗑️
-                  </button>
-                </div>
-              </td>` : ''}
+                <td class="px-4 py-4 text-right">
+                  <div class="flex justify-end gap-2">
+                    <button class="w-8 h-8 rounded-lg bg-cafe text-white flex items-center justify-center hover:bg-[#4a2f1d] transition-colors" data-action="editar-producto" data-id="${escapeHtml(producto.id)}" title="Editar">E</button>
+                    <button class="w-8 h-8 rounded-lg bg-rojoaviso/10 text-rojoaviso hover:bg-rojoaviso hover:text-white flex items-center justify-center transition-all" data-action="eliminar-producto" data-id="${escapeHtml(producto.id)}" title="Eliminar">X</button>
+                  </div>
+                </td>` : ''}
             </tr>
           `).join('')}
         </tbody>
@@ -219,11 +271,88 @@ function renderProductosTable(productos = []) {
   `;
 }
 
-let productosCache = [];
-let currentPage = 1;
-const itemsPerPage = 15;
-let searchQuery = '';
-let editingProductId = null;
+function getFilteredProductos() {
+  const term = searchQuery.toLowerCase();
+  return productosCache.filter((p) =>
+    (p.nombre || '').toLowerCase().includes(term) ||
+    (p.codigo_interno || '').toLowerCase().includes(term) ||
+    (p.codigo_barra_externo || '').toLowerCase().includes(term) ||
+    (p.nombre_etiqueta || '').toLowerCase().includes(term)
+  );
+}
+
+function syncToggleLabels() {
+  const pesableCheck = document.querySelector('#producto-pesable');
+  const pesableLabel = document.querySelector('#pesable-label');
+  const balanzaCheck = document.querySelector('#producto-activo-balanza');
+  const balanzaLabel = document.querySelector('#balanza-label');
+
+  if (pesableLabel) pesableLabel.textContent = pesableCheck?.checked ? 'Pesable' : 'No pesable';
+  if (balanzaLabel) balanzaLabel.textContent = balanzaCheck?.checked ? 'Exportar' : 'No exportar';
+}
+
+function openModal(producto = null) {
+  const modal = document.querySelector('#producto-modal');
+  const modalTitle = document.querySelector('#producto-modal-title');
+  const submitButton = document.querySelector('#producto-submit');
+  const messageBox = document.querySelector('#producto-form-message');
+  const form = document.querySelector('#producto-form');
+
+  editingProductId = producto?.id || null;
+  modalTitle.textContent = producto ? `Editar Producto - ${producto.nombre}` : 'Nuevo Producto';
+  submitButton.textContent = producto ? 'Guardar Cambios' : 'Guardar Producto';
+  messageBox?.classList.add('hidden');
+
+  if (producto) {
+    document.querySelector('#producto-id').value = producto.id;
+    document.querySelector('#producto-codigo-interno').value = producto.codigo_interno || '';
+    document.querySelector('#producto-codigo-externo').value = producto.codigo_barra_externo || '';
+    document.querySelector('#producto-nombre').value = producto.nombre || '';
+    document.querySelector('#producto-unidad').value = producto.unidad || '';
+    document.querySelector('#producto-costo').value = producto.precio_costo ?? '';
+    document.querySelector('#producto-precio').value = producto.precio_venta ?? '';
+    document.querySelector('#producto-categoria').value = producto.id_categoria ?? '';
+    document.querySelector('#producto-impuesto').value = producto.impuesto_especifico ?? 0;
+    document.querySelector('#producto-pesable').checked = !!producto.pesable;
+    document.querySelector('#producto-plu-balanza').value = producto.plu_balanza ?? '';
+    document.querySelector('#producto-nombre-etiqueta').value = producto.nombre_etiqueta || '';
+    document.querySelector('#producto-activo-balanza').checked = !!producto.activo_balanza;
+  } else {
+    form?.reset();
+    document.querySelector('#producto-id').value = '';
+    document.querySelector('#producto-pesable').checked = false;
+    document.querySelector('#producto-activo-balanza').checked = false;
+  }
+
+  syncToggleLabels();
+  modal?.classList.remove('hidden');
+}
+
+function closeModal() {
+  document.querySelector('#producto-modal')?.classList.add('hidden');
+}
+
+function downloadTextFile(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function enviarPluABalanza(content, host, port) {
+  if (!window.electronAPI?.enviarPluBalanza) {
+    throw new Error('El envio local a balanza solo esta disponible desde la app de escritorio.');
+  }
+
+  return window.electronAPI.enviarPluBalanza({
+    host: host.trim(),
+    port: Number(port),
+    payload: content.endsWith('\n') ? content : `${content}\n`
+  });
+}
 
 export async function hydrateProductosView() {
   const container = document.querySelector('#productos-table-container');
@@ -233,195 +362,77 @@ export async function hydrateProductosView() {
   const prevBtn = document.querySelector('#prev-page');
   const nextBtn = document.querySelector('#next-page');
   const openModalBtn = document.querySelector('#abrir-modal-nuevo');
-  const modal = document.querySelector('#producto-modal');
+  const exportButton = document.querySelector('#exportar-labelnet');
+  const updateScaleButton = document.querySelector('#actualizar-plu-balanza');
+  const scaleIpInput = document.querySelector('#balanza-ip');
+  const scalePortInput = document.querySelector('#balanza-puerto');
   const closeModalBtn = document.querySelector('#cerrar-modal');
   const cancelModalBtn = document.querySelector('#cancelar-modal');
+  const modal = document.querySelector('#producto-modal');
   const form = document.querySelector('#producto-form');
   const submitButton = document.querySelector('#producto-submit');
   const messageBox = document.querySelector('#producto-form-message');
   const categorySelect = document.querySelector('#producto-categoria');
-  const modalTitle = document.querySelector('#producto-modal-title');
-
-  const confirmModal = document.querySelector('#confirm-modal');
-  const confirmCancel = document.querySelector('#confirm-cancel');
-  const confirmAccept = document.querySelector('#confirm-accept');
-  const confirmTitle = document.querySelector('#confirm-modal-title');
-  const confirmMessage = document.querySelector('#confirm-modal-message');
-
-  let onConfirmCallback = null;
-
-  function showProgress(show) {
-    const pContainer = document.querySelector('#productos-progress-container');
-    const pBar = document.querySelector('#productos-progress-bar');
-    if (!pContainer || !pBar) return;
-    if (show) {
-      pContainer.classList.remove('hidden');
-      pBar.style.width = '30%';
-      setTimeout(() => pBar.style.width = '90%', 200);
-    } else {
-      pBar.style.width = '100%';
-      setTimeout(() => pContainer.classList.add('hidden'), 500);
-    }
-  }
-
-  function openConfirmModal(title, message, callback) {
-    if (confirmTitle) confirmTitle.textContent = title;
-    if (confirmMessage) confirmMessage.textContent = message;
-    onConfirmCallback = callback;
-    confirmModal?.classList.remove('hidden');
-    setTimeout(() => {
-      confirmModal?.querySelector('.panel')?.classList.remove('scale-95');
-      confirmModal?.querySelector('.panel')?.classList.add('scale-100');
-    }, 10);
-  }
-
-  function closeConfirmModal() {
-    confirmModal?.querySelector('.panel')?.classList.add('scale-95');
-    confirmModal?.querySelector('.panel')?.classList.remove('scale-100');
-    setTimeout(() => {
-      confirmModal?.classList.add('hidden');
-      onConfirmCallback = null;
-    }, 200);
-  }
-
-  function openModal(editing = false, producto = null) {
-    if (getSession()?.usuario?.rol !== 'Admin') return;
-
-    editingProductId = editing ? (producto?.id || null) : null;
-    modalTitle.textContent = editing ? `Editar Producto - ${producto.nombre}` : 'Nuevo Producto';
-    submitButton.textContent = editing ? 'Guardar Cambios' : 'Guardar Producto';
-    messageBox?.classList.add('hidden');
-
-    if (editing && producto) {
-      document.querySelector('#producto-id').value = producto.id;
-      document.querySelector('#producto-codigo-interno').value = producto.codigo_interno || '';
-      document.querySelector('#producto-codigo-externo').value = producto.codigo_barra_externo || '';
-      document.querySelector('#producto-nombre').value = producto.nombre || '';
-      document.querySelector('#producto-unidad').value = producto.unidad || '';
-      document.querySelector('#producto-costo').value = producto.precio_costo ?? '';
-      document.querySelector('#producto-precio').value = producto.precio_venta ?? '';
-      document.querySelector('#producto-categoria').value = producto.id_categoria ?? '';
-      document.querySelector('#producto-impuesto').value = producto.impuesto_especifico ?? 0;
-      const pesableCheck = document.querySelector('#producto-pesable');
-      if (pesableCheck) {
-        pesableCheck.checked = !!producto.pesable;
-        const label = document.querySelector('#pesable-label');
-        if (label) label.textContent = pesableCheck.checked ? 'Pesable (⚖️)' : 'No pesable';
-      }
-    } else {
-      form?.reset();
-      document.querySelector('#producto-id').value = '';
-      const pesableCheck = document.querySelector('#producto-pesable');
-      if (pesableCheck) pesableCheck.checked = false;
-      const label = document.querySelector('#pesable-label');
-      if (label) label.textContent = 'No pesable';
-    }
-
-    // Listener para actualizar la etiqueta del toggle en tiempo real
-    const pesableCheck = document.querySelector('#producto-pesable');
-    const pesableLabel = document.querySelector('#pesable-label');
-    pesableCheck?.addEventListener('change', () => {
-      if (pesableLabel) pesableLabel.textContent = pesableCheck.checked ? 'Pesable (⚖️)' : 'No pesable';
-    });
-
-    modal?.classList.remove('hidden');
-    setTimeout(() => {
-      modal?.querySelector('.panel')?.classList.remove('scale-95');
-      modal?.querySelector('.panel')?.classList.add('scale-100');
-    }, 10);
-  }
-
-  function closeModal() {
-    modal?.querySelector('.panel')?.classList.add('scale-95');
-    modal?.querySelector('.panel')?.classList.remove('scale-100');
-    setTimeout(() => {
-      modal?.classList.add('hidden');
-    }, 200);
-  }
+  const pageMessage = document.querySelector('#productos-page-message');
 
   async function renderTable() {
-    if (!container) return;
-
-    // Filtrado
-    const filtered = productosCache.filter(p => {
-      const term = searchQuery.toLowerCase();
-      return (p.nombre || '').toLowerCase().includes(term) ||
-        (p.codigo_interno || '').toLowerCase().includes(term) ||
-        (p.codigo_barra_externo || '').toLowerCase().includes(term);
-    });
-
-    if (countLabel) countLabel.textContent = filtered.length;
-
-    // Paginación
-    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+    const filtered = getFilteredProductos();
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
     if (currentPage > totalPages) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
 
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    const pagedItems = filtered.slice(start, end);
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const pagedItems = filtered.slice(start, start + ITEMS_PER_PAGE);
 
-    container.innerHTML = renderProductosTable(pagedItems);
-
-    // Controles paginación
-    if (pageInfo) pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+    if (countLabel) countLabel.textContent = filtered.length;
+    if (pageInfo) pageInfo.textContent = `Pagina ${currentPage} de ${totalPages}`;
     if (prevBtn) prevBtn.disabled = currentPage === 1;
     if (nextBtn) nextBtn.disabled = currentPage === totalPages;
 
-    // Eventos de la tabla
-    container.querySelectorAll('[data-action="editar-producto"]').forEach(btn => {
+    container.innerHTML = renderProductosTable(pagedItems);
+
+    container.querySelectorAll('[data-action="editar-producto"]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const prod = productosCache.find(p => String(p.id) === btn.dataset.id);
-        if (prod) openModal(true, prod);
+        const producto = productosCache.find((p) => String(p.id) === btn.dataset.id);
+        if (producto) openModal(producto);
       });
     });
 
-    container.querySelectorAll('[data-action="toggle-status"]').forEach(btn => {
+    container.querySelectorAll('[data-action="toggle-status"]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        if (getSession()?.usuario?.rol !== 'Admin') return;
-
-        const prod = productosCache.find(p => String(p.id) === btn.dataset.id);
-        if (!prod) return;
+        const producto = productosCache.find((p) => String(p.id) === btn.dataset.id);
+        if (!producto) return;
 
         const newState = btn.getAttribute('aria-checked') === 'false';
-
+        showProgress(true);
         try {
-          btn.setAttribute('aria-checked', newState ? 'true' : 'false');
-          showProgress(true);
-          await actualizarProducto(prod.id, { ...prod, activo: newState });
-          prod.activo = newState;
+          await actualizarProducto(producto.id, { ...producto, activo: newState });
+          producto.activo = newState;
+          await renderTable();
         } catch (error) {
-          btn.setAttribute('aria-checked', (!newState) ? 'true' : 'false');
-          alert(`Error al cambiar estado: ${error.message}`);
+          showMessage(pageMessage, 'error', error.message);
         } finally {
           showProgress(false);
         }
       });
     });
 
-    container.querySelectorAll('[data-action="eliminar-producto"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (getSession()?.usuario?.rol !== 'Admin') return;
+    container.querySelectorAll('[data-action="eliminar-producto"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const producto = productosCache.find((p) => String(p.id) === btn.dataset.id);
+        if (!producto) return;
 
-        const prodId = btn.dataset.id;
-        const prod = productosCache.find(p => String(p.id) === prodId);
-        if (!prod) return;
+        if (!window.confirm(`Eliminar "${producto.nombre}"?`)) return;
 
-        openConfirmModal(
-          'Eliminar Producto',
-          `¿Estás seguro de que deseas eliminar permanentemente "${prod.nombre}"? Esta acción no se puede deshacer si el producto no tiene ventas.`,
-          async () => {
-            try {
-              showProgress(true);
-              await eliminarProducto(prodId);
-              await loadData(false);
-            } catch (error) {
-              alert(`Error al eliminar: ${error.message}`);
-            } finally {
-              showProgress(false);
-            }
-          }
-        );
+        showProgress(true);
+        try {
+          await eliminarProducto(producto.id);
+          await loadData(false);
+        } catch (error) {
+          showMessage(pageMessage, 'error', error.message);
+        } finally {
+          showProgress(false);
+        }
       });
     });
   }
@@ -434,68 +445,85 @@ export async function hydrateProductosView() {
         getProductos()
       ]);
 
+      categoriasCache = categoriasResponse.data || [];
       productosCache = productosResponse.data || [];
 
-      if (categorySelect) {
-        categorySelect.innerHTML = `<option value="">Seleccione categoría</option>` +
-          (categoriasResponse.data || []).map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
-      }
-
+      categorySelect.innerHTML = `<option value="">Seleccione categoria</option>${categoriasCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('')}`;
       await renderTable();
     } catch (error) {
-      if (container) container.innerHTML = `<div class="p-8 text-center text-rojoaviso">${escapeHtml(error.message)}</div>`;
+      container.innerHTML = `<div class="p-8 text-center text-rojoaviso">${escapeHtml(error.message)}</div>`;
     } finally {
       if (withProgress) showProgress(false);
     }
   }
 
-  // --- Event Listeners ---
-  openModalBtn?.addEventListener('click', () => openModal(false));
+  openModalBtn?.addEventListener('click', () => openModal());
+  exportButton?.addEventListener('click', async () => {
+    showProgress(true);
+    try {
+      const content = await exportarProductosLabelNet();
+      downloadTextFile('labelnet_productos.txt', content);
+      showMessage(pageMessage, 'success', 'Archivo LabelNet exportado correctamente.');
+    } catch (error) {
+      showMessage(pageMessage, 'error', error.message);
+    } finally {
+      showProgress(false);
+    }
+  });
+
+  updateScaleButton?.addEventListener('click', async () => {
+    showProgress(true);
+    try {
+      const host = scaleIpInput?.value?.trim();
+      const port = scalePortInput?.value?.trim();
+
+      if (!host || !port) {
+        showMessage(pageMessage, 'error', 'Indica la IP y el puerto de la balanza.');
+        return;
+      }
+
+      const content = await exportarProductosLabelNet();
+      const result = await enviarPluABalanza(content, host, port);
+
+      showMessage(
+        pageMessage,
+        'success',
+        `PLU enviado a ${result.host}:${result.port}. Bytes enviados: ${result.bytesSent}.`
+      );
+    } catch (error) {
+      showMessage(pageMessage, 'error', error.message);
+    } finally {
+      showProgress(false);
+    }
+  });
+
   closeModalBtn?.addEventListener('click', closeModal);
   cancelModalBtn?.addEventListener('click', closeModal);
-
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
+  modal?.addEventListener('click', (event) => {
+    if (event.target === modal) closeModal();
   });
 
-  confirmCancel?.addEventListener('click', closeConfirmModal);
-  confirmAccept?.addEventListener('click', async () => {
-    if (onConfirmCallback) await onConfirmCallback();
-    closeConfirmModal();
-  });
-  confirmModal?.addEventListener('click', (e) => { if (e.target === confirmModal) closeConfirmModal(); });
+  document.querySelector('#producto-pesable')?.addEventListener('change', syncToggleLabels);
+  document.querySelector('#producto-activo-balanza')?.addEventListener('change', syncToggleLabels);
 
-  buscador?.addEventListener('input', (e) => {
-    searchQuery = e.target.value;
+  buscador?.addEventListener('input', (event) => {
+    searchQuery = event.target.value || '';
     currentPage = 1;
     renderTable();
   });
 
   prevBtn?.addEventListener('click', () => {
-    if (currentPage > 1) {
-      currentPage--;
-      renderTable();
-      container?.scrollIntoView({ behavior: 'smooth' });
-    }
+    currentPage -= 1;
+    renderTable();
   });
 
   nextBtn?.addEventListener('click', () => {
-    const filtered = productosCache.filter(p => {
-      const term = searchQuery.toLowerCase();
-      return (p.nombre || '').toLowerCase().includes(term) || (p.codigo_interno || '').toLowerCase().includes(term);
-    });
-    const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
-
-    if (currentPage < totalPages) {
-      currentPage++;
-      renderTable();
-      container?.scrollIntoView({ behavior: 'smooth' });
-    }
+    currentPage += 1;
+    renderTable();
   });
 
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (getSession()?.usuario?.rol !== 'Admin') return;
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
 
     const payload = {
       codigo_interno: document.querySelector('#producto-codigo-interno')?.value?.trim() || null,
@@ -506,17 +534,18 @@ export async function hydrateProductosView() {
       precio_venta: Number(document.querySelector('#producto-precio')?.value || 0),
       id_categoria: Number(document.querySelector('#producto-categoria')?.value || 0) || null,
       impuesto_especifico: Number(document.querySelector('#producto-impuesto')?.value || 0),
-      pesable: document.querySelector('#producto-pesable')?.checked === true
+      pesable: document.querySelector('#producto-pesable')?.checked === true,
+      plu_balanza: document.querySelector('#producto-plu-balanza')?.value?.trim() || null,
+      nombre_etiqueta: document.querySelector('#producto-nombre-etiqueta')?.value?.trim() || null,
+      activo_balanza: document.querySelector('#producto-activo-balanza')?.checked === true
     };
 
-    if (submitButton) {
-      submitButton.disabled = true;
-      submitButton.textContent = 'Procesando...';
-    }
+    submitButton.disabled = true;
+    submitButton.textContent = 'Procesando...';
 
     try {
       if (editingProductId) {
-        const original = productosCache.find(p => p.id === editingProductId);
+        const original = productosCache.find((p) => p.id === editingProductId);
         await actualizarProducto(editingProductId, { ...payload, activo: original?.activo ?? true });
       } else {
         await crearProducto(payload);
@@ -524,20 +553,14 @@ export async function hydrateProductosView() {
 
       closeModal();
       await loadData(false);
+      showMessage(pageMessage, 'success', 'Producto guardado correctamente.');
     } catch (error) {
-      if (messageBox) {
-        messageBox.textContent = error.message;
-        messageBox.classList.remove('hidden');
-        messageBox.classList.add('bg-rojoaviso/10', 'text-rojoaviso');
-      }
+      showMessage(messageBox, 'error', error.message);
     } finally {
-      if (submitButton) {
-        submitButton.disabled = false;
-        submitButton.textContent = editingProductId ? 'Guardar Cambios' : 'Guardar Producto';
-      }
+      submitButton.disabled = false;
+      submitButton.textContent = editingProductId ? 'Guardar Cambios' : 'Guardar Producto';
     }
   });
 
-  // --- Initial Load ---
   await loadData();
 }

@@ -43,8 +43,52 @@ async function request(path, options = {}) {
   return data;
 }
 
+async function requestText(path, options = {}) {
+  const session = getSession();
+  const baseUrl = normalizeBaseUrl(options.baseUrl);
+  const headers = {
+    ...(options.headers || {})
+  };
+
+  if (session?.token) {
+    headers.Authorization = `Bearer ${session.token}`;
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: options.method || 'GET',
+    headers
+  });
+
+  const text = await response.text();
+
+  if (response.status === 401 || response.status === 403) {
+    if (session?.token) {
+      clearSession();
+    }
+  }
+
+  if (!response.ok) {
+    let message = 'Error al conectar con el servidor.';
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.error || parsed.mensaje || message;
+    } catch {
+      if (text.trim()) {
+        message = text.trim();
+      }
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return text;
+}
+
 export const apiClient = {
   get: (path, options = {}) => request(path, { ...options, method: 'GET' }),
+  getText: (path, options = {}) => requestText(path, { ...options, method: 'GET' }),
   post: (path, body, options = {}) => request(path, { ...options, method: 'POST', body }),
   put: (path, body, options = {}) => request(path, { ...options, method: 'PUT', body }),
   delete: (path, options = {}) => request(path, { ...options, method: 'DELETE' }),

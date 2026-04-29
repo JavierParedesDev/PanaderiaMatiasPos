@@ -1,16 +1,26 @@
 const pool = require('../config/db');
 
+const resolveSucursalId = (req, fallbackSucursal) => {
+    const requested = Number(fallbackSucursal ?? req.query.id_sucursal);
+    if (req.usuario?.rol === 'Admin' && Number.isInteger(requested) && requested > 0) {
+        return requested;
+    }
+
+    return req.usuario.id_sucursal;
+};
+
 /**
  * Obtener historial detallado de un producto específico
  */
 const getHistorialProducto = async (req, res) => {
     if (req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Solo Admin puede ver el Kardex.' });
 
-    const { id_producto, id_sucursal } = req.params;
+    const id_producto = Number(req.params.id_producto);
+    const id_sucursal = resolveSucursalId(req, req.params.id_sucursal);
 
     try {
         const query = `
-            SELECT k.id, k.tipo_movimiento, k.cantidad, k.stock_posterior, k.fecha, 
+            SELECT k.id, k.tipo_movimiento, k.cantidad, k.stock_posterior, k.fecha,
                    u.username as responsable, k.referencia_id
             FROM kardex k
             JOIN usuarios u ON k.id_usuario = u.id
@@ -18,27 +28,29 @@ const getHistorialProducto = async (req, res) => {
             ORDER BY k.fecha DESC
         `;
         const result = await pool.query(query, [id_producto, id_sucursal]);
-        res.json({ success: true, data: result.rows });
+        res.json({ success: true, id_sucursal, data: result.rows });
     } catch (error) {
         res.status(500).json({ success: false, error: 'Error al consultar el Kardex.' });
     }
 };
 
 /**
- * Obtener todos los movimientos recientes para auditoría global
+ * Obtener movimientos recientes filtrados por sucursal
  */
 const getTodosLosMovimientos = async (req, res) => {
     if (req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Solo Admin puede ver el Kardex.' });
 
+    const id_sucursal = resolveSucursalId(req);
+
     try {
         const query = `
-            SELECT 
-                k.id, 
-                k.tipo_movimiento, 
-                k.cantidad, 
-                k.stock_posterior, 
-                k.fecha, 
-                u.username as responsable, 
+            SELECT
+                k.id,
+                k.tipo_movimiento,
+                k.cantidad,
+                k.stock_posterior,
+                k.fecha,
+                u.username as responsable,
                 p.nombre as producto,
                 p.unidad,
                 s.nombre as sucursal
@@ -46,11 +58,12 @@ const getTodosLosMovimientos = async (req, res) => {
             JOIN usuarios u ON k.id_usuario = u.id
             JOIN productos p ON k.id_producto = p.id
             JOIN sucursales s ON k.id_sucursal = s.id
+            WHERE k.id_sucursal = $1
             ORDER BY k.fecha DESC
             LIMIT 100
         `;
-        const result = await pool.query(query);
-        res.json({ success: true, data: result.rows });
+        const result = await pool.query(query, [id_sucursal]);
+        res.json({ success: true, id_sucursal, data: result.rows });
     } catch (error) {
         console.error('Error Kardex:', error);
         res.status(500).json({ success: false, error: 'Error al obtener auditoría de movimientos.' });

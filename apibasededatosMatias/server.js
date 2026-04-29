@@ -23,7 +23,7 @@ const app = express();
 // CORS permite que tu aplicación frontend se conecte desde otro dominio o IP
 app.use(cors());
 // Permite que la API reciba y entienda datos en formato JSON
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // 3. RUTA DE VERIFICACIÓN (Health Check)
 app.get('/', (req, res) => {

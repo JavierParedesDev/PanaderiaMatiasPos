@@ -29,4 +29,12 @@ const verificarAuth = (req, res, next) => {
     });
 };
 
-module.exports = { verificarAuth };
+const requireAdmin = (req, res, next) => {
+    if (req.usuario?.rol !== 'Admin') {
+        return res.status(403).json({ success: false, error: 'Acceso denegado. Solo administradores.' });
+    }
+
+    next();
+};
+
+module.exports = { verificarAuth, requireAdmin };
