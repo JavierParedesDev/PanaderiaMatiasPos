@@ -1,7 +1,7 @@
 {
   "name": "vendedor-panaderia-matias",
-  "version": "1.0.0",
-  "description": "Terminal de ventas para el personal de Panadería Matías.",
+  "version": "1.0.5",
+  "description": "Terminal de ventas para el personal de PanaderÃ­a MatÃ­as.",
   "main": "main.js",
   "repository": {
     "type": "git",
@@ -9,11 +9,25 @@
   },
   "build": {
     "appId": "com.panaderiamatias.vendedor",
-    "productName": "Matías Ventas",
-    "copyright": "© 2025 Panadería Matías",
+    "productName": "MatÃ­as Ventas",
+    "copyright": "Â© 2025 PanaderÃ­a MatÃ­as",
+    "asarUnpack": [
+      "**/scripts/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts/printer.exe",
+        "to": "scripts/printer.exe"
+      },
+      {
+        "from": "src/renderer/assets/logo.png",
+        "to": "src/renderer/assets/logo.png"
+      }
+    ],
     "directories": {
       "output": "dist"
     },
+    "artifactName": "vendedor-panaderia-matias-setup-${version}.${ext}",
     "win": {
       "icon": "assets/icon.ico",
       "target": [
@@ -33,21 +47,23 @@
       "installerHeaderIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Matías Ventas"
+      "shortcutName": "MatÃ­as Ventas"
     },
     "files": [
       "main.js",
       "preload.js",
+      "cajero.yml",
       "src/**/*",
       "assets/**/*",
-      "!**/scripts/**/*",
+      "scripts/**/*",
       "!**/dist/**/*"
     ],
     "publish": [
       {
         "provider": "github",
         "owner": "JavierParedesDev",
-        "repo": "ActualizacionPanaderiaMatias"
+        "repo": "PanaderiaMatiasPos",
+        "channel": "cajero"
       }
     ]
   },
@@ -66,12 +82,15 @@
   ],
   "author": "Codex",
   "license": "MIT",
-  "dependencies": {},
   "devDependencies": {
     "autoprefixer": "^10.4.21",
     "electron": "^28.3.3",
     "electron-builder": "^26.8.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }
+

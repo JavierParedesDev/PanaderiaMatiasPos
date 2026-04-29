@@ -57,6 +57,10 @@ function buildShell() {
              <span class="text-xl">⚙️</span>
              <span class="text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors">Turno</span>
            </button>
+           <button id="btn-fullscreen" class="header-action-btn group" title="Pantalla Completa">
+             <span class="text-xl">⛶</span>
+             <span class="text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors">Pantalla</span>
+           </button>
            <button id="logout-button" class="header-action-btn group text-rojoaviso hover:bg-rojoaviso/5" title="Cerrar Sistema">
              <span class="text-xl">🚪</span>
              <span class="text-[9px] font-black uppercase opacity-40">Salir</span>
@@ -105,6 +109,12 @@ async function renderProtectedApp() {
     });
   });
 
+  document.querySelector('#btn-fullscreen')?.addEventListener('click', async () => {
+    if (window.electronAPI && window.electronAPI.toggleFullScreen) {
+      await window.electronAPI.toggleFullScreen();
+    }
+  });
+
   document.querySelector('#logout-button')?.addEventListener('click', () => {
     clearSession();
     currentRoute = 'dashboard';
@@ -115,18 +125,41 @@ async function renderProtectedApp() {
   if (config) await config.hydrate();
 }
 
-function renderApp() {
+async function checkTurnoAndRoute() {
+  try {
+    const { getTurnos } = await import('./services/shiftService.js');
+    const { getSession } = await import('./state/sessionStore.js');
+    const session = getSession();
+    const userId = session?.usuario?.id;
+    
+    const sRes = await getTurnos({ estado: 'Abierto' });
+    const miTurno = (sRes.data || []).find(t => t.id_usuario === userId);
+    
+    if (!miTurno) {
+      currentRoute = 'caja';
+    }
+  } catch (e) {
+    console.warn("Error al validar turno:", e);
+  }
+}
+
+async function renderApp() {
+  const { isAuthenticated } = await import('./state/sessionStore.js');
+  const { renderLoginView, attachLoginEvents } = await import('./modules/auth/authView.js');
+
   if (!isAuthenticated()) {
     app.innerHTML = renderLoginView();
     attachLoginEvents({
-      onLoggedIn: () => {
-        currentRoute = 'dashboard';
-        renderApp();
+      onLoggedIn: async () => {
+        await checkTurnoAndRoute();
+        await renderApp();
       }
     });
     return;
   }
-  renderProtectedApp();
+  
+  await checkTurnoAndRoute();
+  await renderProtectedApp();
 }
 
 renderApp();

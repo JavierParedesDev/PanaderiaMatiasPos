@@ -128,4 +128,54 @@ const cerrarTurno = async (req, res) => {
     }
 };
 
-module.exports = { getTurnos, abrirTurno, cerrarTurno };
+const getResumenTurno = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const turnoInfo = await pool.query('SELECT id, monto_apertura, estado FROM turnos_caja WHERE id = $1', [id]);
+        if (turnoInfo.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Turno no encontrado' });
+        }
+        
+        const montoApertura = parseFloat(turnoInfo.rows[0].monto_apertura);
+
+        const ventasMetodos = await pool.query(
+            `SELECT mp.nombre as metodo, COALESCE(SUM(vp.monto_pagado), 0) as total
+             FROM ventas_pagos vp 
+             JOIN ventas_cabecera vc ON vp.id_venta = vc.id 
+             JOIN metodos_pago mp ON vp.id_metodo_pago = mp.id
+             WHERE vc.id_turno = $1
+             GROUP BY mp.nombre`, [id]
+        );
+
+        let totalEfectivo = 0;
+        let totalTarjeta = 0;
+
+        ventasMetodos.rows.forEach(row => {
+            const metodo = (row.metodo || '').toLowerCase();
+            const total = parseFloat(row.total);
+            if (metodo.includes('tarjeta') || metodo.includes('debito') || metodo.includes('credito') || metodo.includes('transfe')) {
+                totalTarjeta += total;
+            } else {
+                totalEfectivo += total;
+            }
+        });
+
+        const efectivoEsperado = montoApertura + totalEfectivo;
+
+        res.json({ 
+            success: true, 
+            data: {
+                id_turno: id,
+                monto_apertura: montoApertura,
+                total_efectivo: totalEfectivo,
+                total_tarjeta: totalTarjeta,
+                total_esperado_efectivo: efectivoEsperado
+            } 
+        });
+    } catch (error) {
+        console.error('Error al obtener resumen del turno:', error);
+        res.status(500).json({ success: false, error: 'Error al obtener resumen del turno.' });
+    }
+};
+
+module.exports = { getTurnos, abrirTurno, cerrarTurno, getResumenTurno };

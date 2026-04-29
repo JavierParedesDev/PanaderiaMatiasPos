@@ -23,7 +23,7 @@ export function renderLoginView() {
               <input id="password" type="password" class="field h-12" autocomplete="current-password" placeholder="••••••••">
             </div>
             <div id="login-error" class="hidden rounded-xl border border-rojoaviso/30 bg-rojoaviso/5 px-4 py-3 text-sm text-center text-rojoaviso"></div>
-            <button id="login-submit" type="submit" class="btn-primary w-full h-12 font-bold text-lg shadow-lg">Entrar a Ventas</button>
+            <button id="login-submit" type="submit" class="bg-cafe text-white hover:bg-[#4a2f1d] transition-all w-full h-12 font-bold text-lg shadow-lg">Entrar a Ventas</button>
           </form>
           <div class="mt-8 text-center">
             <p class="text-[10px] uppercase font-bold tracking-[0.2em] text-cafe/20">&copy; ${new Date().getFullYear()} Panadería Matías. Privado.</p>
