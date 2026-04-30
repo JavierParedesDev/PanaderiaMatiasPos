@@ -32,7 +32,7 @@ const getTurnos = async (req, res) => {
         if (usuariosIds.length) {
             try {
                 const usuariosResult = await pool.query(
-                    `SELECT id, nombre_completo, username
+                    `SELECT id, username
                      FROM usuarios
                      WHERE id = ANY($1)`,
                     [usuariosIds]
@@ -69,7 +69,7 @@ const getTurnos = async (req, res) => {
 
             return {
                 ...turno,
-                nombre_usuario: usuario?.nombre_completo || usuario?.username || `Usuario ${turno.id_usuario || ''}`.trim(),
+                nombre_usuario: usuario?.username || `Usuario ${turno.id_usuario || ''}`.trim(),
                 username: usuario?.username || `usuario_${turno.id_usuario || ''}`.trim(),
                 nombre_sucursal: sucursalItem?.nombre || `Sucursal ${turno.id_sucursal || ''}`.trim()
             };

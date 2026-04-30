@@ -3,6 +3,7 @@ const net = require('net');
 const { app, BrowserWindow, ipcMain } = require('electron');
 
 const DEFAULT_SCALE_TIMEOUT_MS = 8000;
+const appIconPath = path.join(__dirname, 'assets', 'icon.ico');
 
 function toPayloadBuffer(payload) {
   if (typeof payload === 'string') {
@@ -117,6 +118,7 @@ function createWindow() {
     minWidth: 1180,
     minHeight: 760,
     backgroundColor: '#f3efe6',
+    icon: appIconPath,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -130,6 +132,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  app.setAppUserModelId('com.panaderiamatias.admin');
+
   ipcMain.handle('scale:send-plu', async (_event, payload) => sendScalePayload(payload));
 
   createWindow();

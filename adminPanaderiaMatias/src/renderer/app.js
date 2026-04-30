@@ -167,15 +167,15 @@ function buildShell() {
   const config = getRouteConfig(currentRoute);
 
   return `
-    <div class="grid min-h-screen grid-cols-[260px_1fr]">
-      <aside class="flex flex-col border-r border-borde bg-[#fdfaf5] shadow-inner">
+    <div class="grid h-screen overflow-hidden grid-cols-[260px_1fr]">
+      <aside class="flex h-screen min-h-0 flex-col overflow-hidden border-r border-borde bg-[#fdfaf5] shadow-inner">
         <div class="p-6 border-b border-borde/30 text-center">
           <img src="./assets/logo.png" alt="Logo Panaderia Matias" class="w-16 mx-auto mb-3 hover:scale-105 transition-transform duration-300">
           <h1 class="text-lg font-black tracking-tighter text-[#2d221b]">Matias Admin</h1>
           <p class="text-[9px] font-bold text-cafe/30 uppercase tracking-[0.3em] mt-0.5">Panel de Control</p>
         </div>
 
-        <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav class="min-h-0 flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           ${buildNav()}
         </nav>
 
@@ -195,10 +195,12 @@ function buildShell() {
         </div>
       </aside>
 
-      <main class="h-screen overflow-auto bg-crema/20 p-8 lg:p-12">
-        <div class="max-w-7xl mx-auto">
+      <main class="h-screen overflow-hidden bg-crema/20">
+        <div class="h-full overflow-y-auto p-8 lg:p-12">
+          <div class="max-w-7xl mx-auto">
           <div id="route-container">
             ${config ? config.render() : '<p>Ruta no encontrada</p>'}
+          </div>
           </div>
         </div>
       </main>

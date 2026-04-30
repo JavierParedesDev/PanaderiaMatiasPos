@@ -52,4 +52,58 @@ const getUsuarios = async (req, res) => {
     }
 };
 
-module.exports = { crearUsuario, getUsuarios };
+// Actualizar un usuario
+const actualizarUsuario = async (req, res) => {
+    if (req.usuario.rol !== 'Admin') {
+        return res.status(403).json({ error: 'Acceso denegado.' });
+    }
+
+    const { id } = req.params;
+    const { username, password, id_rol, id_sucursal, activo } = req.body;
+
+    try {
+        let query = 'UPDATE usuarios SET username = $1, id_rol = $2, id_sucursal = $3, activo = $4';
+        let values = [username, id_rol, id_sucursal, activo];
+        
+        if (password) {
+            const saltRounds = 10;
+            const password_hash = await bcrypt.hash(password, saltRounds);
+            query += ', password_hash = $5 WHERE id = $6 RETURNING id, username';
+            values.push(password_hash, id);
+        } else {
+            query += ' WHERE id = $5 RETURNING id, username';
+            values.push(id);
+        }
+
+        const result = await pool.query(query, values);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        res.json({ success: true, mensaje: 'Usuario actualizado exitosamente', usuario: result.rows[0] });
+    } catch (error) {
+        console.error('Error al actualizar usuario:', error);
+        res.status(500).json({ success: false, error: 'Error interno al actualizar.' });
+    }
+};
+
+// Eliminar un usuario
+const eliminarUsuario = async (req, res) => {
+    if (req.usuario.rol !== 'Admin') {
+        return res.status(403).json({ error: 'Acceso denegado.' });
+    }
+
+    const { id } = req.params;
+
+    try {
+        const result = await pool.query('DELETE FROM usuarios WHERE id = $1 RETURNING id', [id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        res.json({ success: true, mensaje: 'Usuario eliminado exitosamente' });
+    } catch (error) {
+        console.error('Error al eliminar usuario:', error);
+        res.status(500).json({ success: false, error: 'Error al eliminar el usuario.' });
+    }
+};
+
+module.exports = { crearUsuario, getUsuarios, actualizarUsuario, eliminarUsuario };

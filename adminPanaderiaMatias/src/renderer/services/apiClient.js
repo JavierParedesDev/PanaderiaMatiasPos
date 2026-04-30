@@ -91,7 +91,7 @@ export const apiClient = {
   getText: (path, options = {}) => requestText(path, { ...options, method: 'GET' }),
   post: (path, body, options = {}) => request(path, { ...options, method: 'POST', body }),
   put: (path, body, options = {}) => request(path, { ...options, method: 'PUT', body }),
-  delete: (path, options = {}) => request(path, { ...options, method: 'DELETE' }),
+  delete: (path, options = {}) => request(path, { ...options, method: 'DELETE', body: options.body }),
   defaultBaseUrl: DEFAULT_API_URL,
   normalizeBaseUrl
 };

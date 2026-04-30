@@ -141,12 +141,15 @@ export function renderKardexSkeleton() {
 }
 
 /* AUDITORIA */
-async function renderAuditoria() {
+async function renderAuditoria(params = {}) {
   const container = document.querySelector('#kardex-content');
   container.innerHTML = `<div class="panel h-80 animate-pulse bg-white/50"></div>`;
   try {
-    const res = await getKardexTodos();
+    const page = params.page || 1;
+    const res = await getKardexTodos({ page });
     const movimientos = res.data || [];
+    const currentPage = Number(res.page || 1);
+    const totalPages = Number(res.total_pages || 1);
 
     const typeStyle = (tipo) => {
       if (['COMPRA', 'CARGA_INICIAL', 'VENTA_ANULADA'].includes(tipo)) return 'bg-verdeok/10 text-verdeok';
@@ -156,10 +159,10 @@ async function renderAuditoria() {
     const isEntry = (tipo) => ['COMPRA', 'CARGA_INICIAL', 'VENTA_ANULADA'].includes(tipo);
 
     container.innerHTML = `
-      <div class="panel bg-white shadow-sm overflow-hidden">
+      <div class="panel bg-white shadow-sm overflow-hidden mb-4">
         <div class="px-6 py-4 border-b border-borde/30 flex items-center justify-between bg-crema/10">
           <h2 class="text-lg font-black text-[#2d221b]">Historial de Movimientos</h2>
-          <span class="text-[10px] font-bold text-cafe/30 uppercase">${movimientos.length} registros</span>
+          <span class="text-[10px] font-bold text-cafe/30 uppercase">${res.total_items || movimientos.length} registros</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left">
@@ -194,7 +197,20 @@ async function renderAuditoria() {
             </tbody>
           </table>
         </div>
+      </div>
+      <div class="flex items-center justify-center gap-4 mt-6">
+        <button id="kardex-prev" class="btn-secondary px-4 py-2 text-xs" ${currentPage <= 1 ? 'disabled' : ''}>Anterior</button>
+        <span class="text-sm font-black text-cafe">Pagina ${currentPage} de ${totalPages}</span>
+        <button id="kardex-next" class="btn-secondary px-4 py-2 text-xs" ${currentPage >= totalPages ? 'disabled' : ''}>Siguiente</button>
       </div>`;
+
+    document.querySelector('#kardex-prev')?.addEventListener('click', async () => {
+      await renderAuditoria({ page: Math.max(1, currentPage - 1) });
+    });
+
+    document.querySelector('#kardex-next')?.addEventListener('click', async () => {
+      await renderAuditoria({ page: Math.min(totalPages, currentPage + 1) });
+    });
   } catch (e) {
     container.innerHTML = errorCard(e.message);
   }

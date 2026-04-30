@@ -21,6 +21,23 @@ export async function exportarProductosLabelNet(params = {}) {
   return apiClient.getText(`/productos/export/labelnet${buildQuery(params)}`);
 }
 
+export async function exportarBackupProductos(params = {}) {
+  return apiClient.getText(`/productos/backup${buildQuery(params)}`);
+}
+
+export async function getProductosBalanzaCleanup() {
+  return apiClient.get('/productos/cleanup/balanza-lista');
+}
+
+export async function eliminarDuplicadosBalanza(ids = [], options = {}) {
+  return apiClient.delete('/productos/cleanup/balanza-duplicados', {
+    body: {
+      ids,
+      force: options.force === true
+    }
+  });
+}
+
 export async function importarProductosLabelNet(payload) {
   return apiClient.post('/productos/import/labelnet', payload);
 }

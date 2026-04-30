@@ -41,8 +41,15 @@ const getTodosLosMovimientos = async (req, res) => {
     if (req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Solo Admin puede ver el Kardex.' });
 
     const id_sucursal = resolveSucursalId(req);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 30);
+    const offset = (page - 1) * limit;
 
     try {
+        const countResult = await pool.query('SELECT COUNT(*) FROM kardex WHERE id_sucursal = $1', [id_sucursal]);
+        const totalItems = parseInt(countResult.rows[0].count);
+        const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
         const query = `
             SELECT
                 k.id,
@@ -60,10 +67,17 @@ const getTodosLosMovimientos = async (req, res) => {
             JOIN sucursales s ON k.id_sucursal = s.id
             WHERE k.id_sucursal = $1
             ORDER BY k.fecha DESC
-            LIMIT 100
+            LIMIT $2 OFFSET $3
         `;
-        const result = await pool.query(query, [id_sucursal]);
-        res.json({ success: true, id_sucursal, data: result.rows });
+        const result = await pool.query(query, [id_sucursal, limit, offset]);
+        res.json({ 
+            success: true, 
+            id_sucursal, 
+            data: result.rows,
+            page,
+            total_pages: totalPages,
+            total_items: totalItems
+        });
     } catch (error) {
         console.error('Error Kardex:', error);
         res.status(500).json({ success: false, error: 'Error al obtener auditoría de movimientos.' });

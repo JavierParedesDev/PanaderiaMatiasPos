@@ -1,4 +1,12 @@
-import { actualizarProducto, exportarProductosLabelNet, getProductos, importarProductosLabelNet } from '../../services/productService.js';
+import {
+  actualizarProducto,
+  eliminarDuplicadosBalanza,
+  exportarBackupProductos,
+  exportarProductosLabelNet,
+  getProductos,
+  getProductosBalanzaCleanup,
+  importarProductosLabelNet
+} from '../../services/productService.js';
 import { escapeHtml, formatCurrency } from '../../utils/formatters.js';
 
 const SCALES_STORAGE_KEY = 'panaderia_matias_balanzas';
@@ -14,6 +22,8 @@ let searchQuery = '';
 let onlyReady = true;
 let currentPage = 1;
 let directFormat = 'digi-f1-25';
+let cleanupProductosCache = [];
+let cleanupSelectedIds = new Set();
 
 const ITEMS_PER_PAGE = 50;
 
@@ -477,6 +487,188 @@ function downloadTextFile(filename, content) {
   URL.revokeObjectURL(url);
 }
 
+function selectedCleanupIds() {
+  return [...cleanupSelectedIds];
+}
+
+function updateCleanupSelectedCount() {
+  const label = document.querySelector('#cleanup-seleccionados');
+  if (label) label.textContent = String(cleanupSelectedIds.size);
+}
+
+function renderCleanupBalanzaTable() {
+  const container = document.querySelector('#cleanup-balanza-table');
+  if (!container) return;
+
+  const seguros = cleanupProductosCache.filter((producto) => producto.seguro_eliminar);
+  const bloqueados = cleanupProductosCache.length - seguros.length;
+
+  document.querySelector('#cleanup-total').textContent = String(cleanupProductosCache.length);
+  document.querySelector('#cleanup-seguros').textContent = String(seguros.length);
+  document.querySelector('#cleanup-bloqueados').textContent = String(bloqueados);
+  updateCleanupSelectedCount();
+
+  if (!cleanupProductosCache.length) {
+    container.innerHTML = `
+      <div class="py-16 text-center">
+        <p class="text-sm font-black uppercase tracking-widest text-cafe/30">No hay productos de balanza detectados</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="min-w-full text-sm">
+      <thead class="bg-crema/30 text-left text-[10px] font-black uppercase tracking-widest text-cafe/50">
+        <tr>
+          <th class="px-4 py-3">Sel.</th>
+          <th class="px-4 py-3">Producto</th>
+          <th class="px-4 py-3 text-center">PLU</th>
+          <th class="px-4 py-3 text-right">Stock</th>
+          <th class="px-4 py-3 text-center">Estado</th>
+          <th class="px-4 py-3">Bloqueos</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-borde/20">
+        ${cleanupProductosCache.map((producto) => {
+    const bloqueos = [
+      producto.tiene_ventas ? 'ventas' : '',
+      producto.tiene_facturas ? 'facturas' : '',
+      producto.tiene_kardex ? 'kardex' : '',
+      Number(producto.stock_actual || 0) !== 0 ? 'stock' : '',
+      !producto.tiene_nombre_duplicado ? 'sin original equivalente' : ''
+    ].filter(Boolean);
+
+    return `
+          <tr class="${producto.seguro_eliminar ? 'bg-verdeok/5' : 'bg-rojoaviso/5'}">
+            <td class="px-4 py-3">
+              <input
+                type="checkbox"
+                class="cleanup-balanza-check h-4 w-4 accent-[#9d3b2f]"
+                value="${producto.id}"
+                ${cleanupSelectedIds.has(Number(producto.id)) ? 'checked' : ''}
+              >
+            </td>
+            <td class="px-4 py-3">
+              <p class="font-black text-[#2d221b]">${escapeHtml(producto.nombre)}</p>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-cafe/35">ID ${producto.id} - Barra ${escapeHtml(producto.codigo_barra_externo || '-')}</p>
+            </td>
+            <td class="px-4 py-3 text-center font-mono font-bold text-cafe">${escapeHtml(producto.plu_balanza || '-')}</td>
+            <td class="px-4 py-3 text-right font-black text-cafe">${producto.stock_actual || 0}</td>
+            <td class="px-4 py-3 text-center">
+              <span class="badge ${producto.seguro_eliminar ? 'bg-verdeok/10 text-verdeok' : 'bg-rojoaviso/10 text-rojoaviso'} font-black">
+                ${producto.seguro_eliminar ? 'Seguro eliminar' : 'Requiere forzado'}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-xs font-bold text-cafe/50">${bloqueos.length ? escapeHtml(bloqueos.join(', ')) : '-'}</td>
+          </tr>
+        `;
+  }).join('')}
+      </tbody>
+    </table>
+  `;
+
+  document.querySelectorAll('.cleanup-balanza-check').forEach((input) => {
+    input.addEventListener('change', (event) => {
+      const id = Number(event.target.value);
+      if (!Number.isInteger(id) || id <= 0) return;
+
+      if (event.target.checked) {
+        cleanupSelectedIds.add(id);
+      } else {
+        cleanupSelectedIds.delete(id);
+      }
+
+      updateCleanupSelectedCount();
+    });
+  });
+}
+
+async function loadCleanupBalanza() {
+  const container = document.querySelector('#cleanup-balanza-table');
+  if (container) {
+    container.innerHTML = `
+      <div class="animate-pulse space-y-4">
+        <div class="h-10 bg-crema/50 rounded-lg w-full"></div>
+        <div class="h-12 bg-crema/20 rounded-lg w-full"></div>
+        <div class="h-12 bg-crema/20 rounded-lg w-full"></div>
+      </div>
+    `;
+  }
+
+  try {
+    showMessage('success', 'Cargando productos de balanza...');
+    const response = await getProductosBalanzaCleanup();
+    cleanupProductosCache = response.data || [];
+    cleanupSelectedIds = new Set([...cleanupSelectedIds].filter((id) =>
+      cleanupProductosCache.some((producto) => Number(producto.id) === id)
+    ));
+    renderCleanupBalanzaTable();
+    showMessage('success', `Productos de balanza encontrados: ${cleanupProductosCache.length}.`);
+  } catch (error) {
+    showMessage('error', error.message);
+  }
+}
+
+async function downloadBackup(format) {
+  try {
+    const content = await exportarBackupProductos({ format });
+    const extension = format === 'csv' ? 'csv' : 'json';
+    downloadTextFile(`backup_productos.${extension}`, content);
+    showMessage('success', `Backup ${extension.toUpperCase()} generado.`);
+  } catch (error) {
+    showMessage('error', error.message);
+  }
+}
+
+async function deleteSelectedCleanupProducts() {
+  const ids = selectedCleanupIds();
+  if (!ids.length) {
+    showMessage('error', 'Selecciona al menos un producto de balanza para eliminar.');
+    return;
+  }
+
+  const confirmed = window.confirm(`Se eliminaran ${ids.length} productos de balanza. Si alguno tiene historial y no hay producto original equivalente, tambien se borraran sus detalles asociados. Confirma que ya descargaste el backup.`);
+  if (!confirmed) return;
+
+  try {
+    const response = await eliminarDuplicadosBalanza(ids, { force: true });
+    showMessage('success', response.mensaje || 'Productos eliminados.');
+    await loadCleanupBalanza();
+  } catch (error) {
+    showMessage('error', error.message);
+  }
+}
+
+async function hydrateBalanzaCleanupView() {
+  document.querySelector('#backup-productos-json')?.addEventListener('click', () => downloadBackup('json'));
+  document.querySelector('#backup-productos-csv')?.addEventListener('click', () => downloadBackup('csv'));
+  document.querySelector('#recargar-balanza-cleanup')?.addEventListener('click', loadCleanupBalanza);
+  document.querySelector('#seleccionar-todo-balanza')?.addEventListener('click', () => {
+    cleanupSelectedIds = new Set(
+      cleanupProductosCache.map((producto) => Number(producto.id))
+    );
+    renderCleanupBalanzaTable();
+    showMessage('success', `Seleccionados ${cleanupSelectedIds.size} productos de balanza.`);
+  });
+  document.querySelector('#seleccionar-seguros-balanza')?.addEventListener('click', () => {
+    cleanupSelectedIds = new Set(
+      cleanupProductosCache
+        .filter((producto) => producto.seguro_eliminar)
+        .map((producto) => Number(producto.id))
+    );
+    renderCleanupBalanzaTable();
+    showMessage('success', `Seleccionados ${cleanupSelectedIds.size} productos seguros.`);
+  });
+  document.querySelector('#limpiar-seleccion-balanza')?.addEventListener('click', () => {
+    cleanupSelectedIds.clear();
+    renderCleanupBalanzaTable();
+  });
+  document.querySelector('#eliminar-seleccion-balanza')?.addEventListener('click', deleteSelectedCleanupProducts);
+
+  await loadCleanupBalanza();
+}
+
 function encodeDigiBcd(value) {
   const digits = String(Math.max(0, Number(value) || 0)).padStart(8, '0').slice(-8);
   const bytes = new Uint8Array(4);
@@ -778,7 +970,9 @@ async function importLabelNetCsv(file) {
 }
 
 export async function hydrateBalanzaView() {
-  if (BALANZA_UNDER_CONSTRUCTION) return;
+  if (BALANZA_UNDER_CONSTRUCTION) {
+    return;
+  }
 
   balanzasCache = loadScales();
   selectedScaleId = balanzasCache[0]?.id || '';

@@ -1,6 +1,6 @@
 {
   "name": "adminpanaderiamatias",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Panel de administración interno de Panadería Matías.",
   "main": "main.js",
   "repository": {
@@ -9,6 +9,7 @@
   },
   "build": {
     "appId": "com.panaderiamatias.admin",
+    "icon": "assets/icon.ico",
     "productName": "Panadería Matías Admin",
     "copyright": "© 2025 Panadería Matías",
     "directories": {

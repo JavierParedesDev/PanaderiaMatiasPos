@@ -45,6 +45,343 @@ const normalizeLabelNetImportRow = (row) => {
     };
 };
 
+const csvValue = (value) => {
+    if (value === undefined || value === null) return '';
+    const text = String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+};
+
+const exportarBackupProductos = async (req, res) => {
+    if (req.usuario.rol !== 'Admin') {
+        return res.status(403).json({ success: false, error: 'Acceso denegado. Solo administradores.' });
+    }
+
+    const format = String(req.query.format || 'json').toLowerCase();
+
+    try {
+        const result = await pool.query(
+            `SELECT
+                p.*,
+                c.nombre as categoria,
+                COALESCE(
+                    json_agg(
+                        DISTINCT jsonb_build_object(
+                            'id_sucursal', i.id_sucursal,
+                            'stock_actual', i.stock_actual,
+                            'stock_minimo', i.stock_minimo
+                        )
+                    ) FILTER (WHERE i.id_sucursal IS NOT NULL),
+                    '[]'::json
+                ) as inventarios
+             FROM productos p
+             LEFT JOIN categorias c ON c.id = p.id_categoria
+             LEFT JOIN inventarios i ON i.id_producto = p.id
+             GROUP BY p.id, c.nombre
+             ORDER BY p.nombre ASC, p.id ASC`
+        );
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+        if (format === 'csv') {
+            const headers = [
+                'id',
+                'codigo_interno',
+                'codigo_barra_externo',
+                'nombre',
+                'unidad',
+                'precio_costo',
+                'precio_venta',
+                'categoria',
+                'activo',
+                'pesable',
+                'plu_balanza',
+                'nombre_etiqueta',
+                'activo_balanza'
+            ];
+            const lines = [
+                headers.join(','),
+                ...result.rows.map((row) => headers.map((header) => csvValue(row[header])).join(','))
+            ];
+
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="backup_productos_${timestamp}.csv"`);
+            return res.send(lines.join('\n'));
+        }
+
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="backup_productos_${timestamp}.json"`);
+        res.send(JSON.stringify({
+            success: true,
+            exported_at: new Date().toISOString(),
+            cantidad: result.rowCount,
+            data: result.rows
+        }, null, 2));
+    } catch (error) {
+        console.error('Error al exportar backup de productos:', error);
+        res.status(500).json({ success: false, error: 'Error al exportar backup de productos.' });
+    }
+};
+
+const getProductosBalanza = async (req, res) => {
+    if (req.usuario.rol !== 'Admin') {
+        return res.status(403).json({ success: false, error: 'Acceso denegado. Solo administradores.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `SELECT
+                p.id,
+                p.nombre,
+                p.codigo_interno,
+                p.codigo_barra_externo,
+                p.precio_costo,
+                p.precio_venta,
+                p.pesable,
+                p.plu_balanza,
+                p.nombre_etiqueta,
+                p.activo,
+                p.activo_balanza,
+                COALESCE(i.stock_actual, 0) as stock_actual,
+                EXISTS (SELECT 1 FROM ventas_detalle vd WHERE vd.id_producto = p.id) as tiene_ventas,
+                EXISTS (SELECT 1 FROM factura_detalle fd WHERE fd.id_producto = p.id) as tiene_facturas,
+                EXISTS (SELECT 1 FROM kardex k WHERE k.id_producto = p.id) as tiene_kardex,
+                EXISTS (
+                    SELECT 1
+                    FROM productos original
+                    WHERE original.id <> p.id
+                      AND UPPER(TRIM(original.nombre)) = UPPER(TRIM(p.nombre))
+                ) as tiene_nombre_duplicado,
+                (
+                    p.pesable = TRUE
+                    AND p.activo_balanza = TRUE
+                    AND p.plu_balanza IS NOT NULL
+                    AND p.codigo_interno IS NULL
+                    AND COALESCE(p.precio_costo, 0) = 0
+                    AND COALESCE(i.stock_actual, 0) = 0
+                    AND NOT EXISTS (SELECT 1 FROM ventas_detalle vd WHERE vd.id_producto = p.id)
+                    AND NOT EXISTS (SELECT 1 FROM factura_detalle fd WHERE fd.id_producto = p.id)
+                    AND NOT EXISTS (SELECT 1 FROM kardex k WHERE k.id_producto = p.id)
+                    AND EXISTS (
+                        SELECT 1
+                        FROM productos original
+                        WHERE original.id <> p.id
+                          AND UPPER(TRIM(original.nombre)) = UPPER(TRIM(p.nombre))
+                    )
+                ) as seguro_eliminar
+             FROM productos p
+             LEFT JOIN inventarios i ON i.id_producto = p.id
+             WHERE p.codigo_interno IS NULL
+               AND COALESCE(p.precio_costo, 0) = 0
+               AND UPPER(COALESCE(p.unidad, '')) = 'KG'
+               AND p.plu_balanza IS NOT NULL
+               AND (
+                    p.pesable = TRUE
+                    OR p.activo_balanza = TRUE
+                    OR p.nombre_etiqueta IS NOT NULL
+               )
+             ORDER BY seguro_eliminar DESC, p.nombre ASC, p.id DESC`
+        );
+
+        res.json({
+            success: true,
+            cantidad: result.rowCount,
+            data: result.rows
+        });
+    } catch (error) {
+        console.error('Error al listar productos de balanza:', error);
+        res.status(500).json({ success: false, error: 'Error al listar productos de balanza.' });
+    }
+};
+
+const getDuplicadosBalanza = async (req, res) => {
+    if (req.usuario.rol !== 'Admin') {
+        return res.status(403).json({ success: false, error: 'Acceso denegado. Solo administradores.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `WITH candidatos AS (
+                SELECT
+                    p.id,
+                    p.nombre,
+                    p.codigo_interno,
+                    p.codigo_barra_externo,
+                    p.precio_costo,
+                    p.precio_venta,
+                    p.pesable,
+                    p.plu_balanza,
+                    p.activo_balanza,
+                    COALESCE(i.stock_actual, 0) as stock_actual,
+                    EXISTS (SELECT 1 FROM ventas_detalle vd WHERE vd.id_producto = p.id) as tiene_ventas,
+                    EXISTS (SELECT 1 FROM factura_detalle fd WHERE fd.id_producto = p.id) as tiene_facturas,
+                    EXISTS (SELECT 1 FROM kardex k WHERE k.id_producto = p.id) as tiene_kardex,
+                    EXISTS (
+                        SELECT 1
+                        FROM productos original
+                        WHERE original.id <> p.id
+                          AND UPPER(TRIM(original.nombre)) = UPPER(TRIM(p.nombre))
+                    ) as tiene_nombre_duplicado
+                FROM productos p
+                LEFT JOIN inventarios i ON i.id_producto = p.id
+                WHERE p.pesable = TRUE
+                  AND p.activo_balanza = TRUE
+                  AND p.plu_balanza IS NOT NULL
+                  AND p.codigo_interno IS NULL
+                  AND COALESCE(p.precio_costo, 0) = 0
+            )
+            SELECT *
+            FROM candidatos
+            WHERE tiene_nombre_duplicado = TRUE
+              AND tiene_ventas = FALSE
+              AND tiene_facturas = FALSE
+              AND tiene_kardex = FALSE
+              AND COALESCE(stock_actual, 0) = 0
+            ORDER BY nombre ASC, id DESC`
+        );
+
+        res.json({
+            success: true,
+            cantidad: result.rowCount,
+            data: result.rows
+        });
+    } catch (error) {
+        console.error('Error al buscar duplicados de balanza:', error);
+        res.status(500).json({ success: false, error: 'Error al buscar duplicados de balanza.' });
+    }
+};
+
+const eliminarDuplicadosBalanza = async (req, res) => {
+    if (req.usuario.rol !== 'Admin') {
+        return res.status(403).json({ success: false, error: 'Acceso denegado. Solo administradores.' });
+    }
+
+    const ids = Array.isArray(req.body?.ids)
+        ? req.body.ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+        : [];
+    const force = normalizeBoolean(req.body?.force);
+
+    if (!ids.length) {
+        return res.status(400).json({ success: false, error: 'Debe indicar los IDs a eliminar.' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const validacion = await client.query(
+            `WITH candidatos AS (
+                SELECT
+                    p.id,
+                    p.nombre,
+                    COALESCE(i.stock_actual, 0) as stock_actual,
+                    EXISTS (SELECT 1 FROM ventas_detalle vd WHERE vd.id_producto = p.id) as tiene_ventas,
+                    EXISTS (SELECT 1 FROM factura_detalle fd WHERE fd.id_producto = p.id) as tiene_facturas,
+                    EXISTS (SELECT 1 FROM kardex k WHERE k.id_producto = p.id) as tiene_kardex,
+                    (
+                        SELECT original.id
+                        FROM productos original
+                        WHERE original.id <> p.id
+                          AND NOT (original.id = ANY($1::int[]))
+                          AND UPPER(TRIM(original.nombre)) = UPPER(TRIM(p.nombre))
+                        ORDER BY
+                          CASE WHEN original.codigo_interno IS NOT NULL THEN 0 ELSE 1 END,
+                          CASE WHEN original.activo = TRUE THEN 0 ELSE 1 END,
+                          original.id ASC
+                        LIMIT 1
+                    ) as id_producto_destino,
+                    EXISTS (
+                        SELECT 1
+                        FROM productos original
+                        WHERE original.id <> p.id
+                          AND UPPER(TRIM(original.nombre)) = UPPER(TRIM(p.nombre))
+                    ) as tiene_nombre_duplicado
+                FROM productos p
+                LEFT JOIN inventarios i ON i.id_producto = p.id
+                WHERE p.id = ANY($1::int[])
+                  AND p.codigo_interno IS NULL
+                  AND COALESCE(p.precio_costo, 0) = 0
+                  AND UPPER(COALESCE(p.unidad, '')) = 'KG'
+                  AND p.plu_balanza IS NOT NULL
+                  AND (
+                    p.pesable = TRUE
+                    OR p.activo_balanza = TRUE
+                    OR p.nombre_etiqueta IS NOT NULL
+                  )
+            )
+            SELECT *
+            FROM candidatos
+            WHERE $2::boolean = TRUE
+               OR (
+                    tiene_ventas = FALSE
+                    AND tiene_facturas = FALSE
+                    AND tiene_nombre_duplicado = TRUE
+                    AND tiene_kardex = FALSE
+                    AND COALESCE(stock_actual, 0) = 0
+               )`,
+            [ids, force]
+        );
+
+        const validIds = validacion.rows.map((row) => Number(row.id));
+        const blockedIds = ids.filter((id) => !validIds.includes(id));
+
+        if (blockedIds.length) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                success: false,
+                error: force
+                    ? 'Hay productos fuera de la lista de balanza.'
+                    : 'Hay productos que no cumplen las condiciones seguras para eliminar.',
+                blockedIds
+            });
+        }
+
+        if (force) {
+            for (const row of validacion.rows) {
+                const sourceId = Number(row.id);
+                const targetId = Number(row.id_producto_destino || 0);
+
+                if (targetId > 0) {
+                    await client.query('UPDATE ventas_detalle SET id_producto = $1 WHERE id_producto = $2', [targetId, sourceId]);
+                    await client.query('UPDATE factura_detalle SET id_producto = $1 WHERE id_producto = $2', [targetId, sourceId]);
+                    await client.query('UPDATE kardex SET id_producto = $1 WHERE id_producto = $2', [targetId, sourceId]);
+                    await client.query(
+                        `INSERT INTO inventarios (id_producto, id_sucursal, stock_actual, stock_minimo)
+                         SELECT $1, id_sucursal, stock_actual, stock_minimo
+                         FROM inventarios
+                         WHERE id_producto = $2
+                         ON CONFLICT (id_producto, id_sucursal)
+                         DO UPDATE SET
+                            stock_actual = inventarios.stock_actual + EXCLUDED.stock_actual,
+                            stock_minimo = GREATEST(COALESCE(inventarios.stock_minimo, 0), COALESCE(EXCLUDED.stock_minimo, 0))`,
+                        [targetId, sourceId]
+                    );
+                } else {
+                    await client.query('DELETE FROM ventas_detalle WHERE id_producto = $1', [sourceId]);
+                    await client.query('DELETE FROM factura_detalle WHERE id_producto = $1', [sourceId]);
+                    await client.query('DELETE FROM kardex WHERE id_producto = $1', [sourceId]);
+                }
+            }
+        }
+        await client.query('DELETE FROM inventarios WHERE id_producto = ANY($1::int[])', [validIds]);
+        const deleted = await client.query('DELETE FROM productos WHERE id = ANY($1::int[]) RETURNING id, nombre', [validIds]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            mensaje: `Duplicados de balanza eliminados: ${deleted.rowCount}.`,
+            data: deleted.rows
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error al eliminar duplicados de balanza:', error);
+        res.status(500).json({ success: false, error: 'Error al eliminar duplicados de balanza.' });
+    } finally {
+        client.release();
+    }
+};
+
 /**
  * Obtener catálogo de productos
  * Incluye cálculos de utilidad y margen
@@ -418,6 +755,10 @@ const eliminarProducto = async (req, res) => {
 
 module.exports = {
     getProductos,
+    exportarBackupProductos,
+    getProductosBalanza,
+    getDuplicadosBalanza,
+    eliminarDuplicadosBalanza,
     exportarProductosLabelNet,
     importarProductosLabelNet,
     crearProducto,
