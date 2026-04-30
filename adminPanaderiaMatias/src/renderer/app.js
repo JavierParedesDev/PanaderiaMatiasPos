@@ -9,6 +9,7 @@ import { renderKardexSkeleton, hydrateKardexView } from './modules/kardex/kardex
 import { renderReportesSkeleton, hydrateReportesView } from './modules/reportes/reportesView.js';
 import { renderMaestrosSkeleton, hydrateMaestrosView } from './modules/maestros/maestrosView.js';
 import { renderUsuariosSkeleton, hydrateUsuariosView } from './modules/usuarios/usuariosView.js';
+import { renderConsumoSkeleton, hydrateConsumoView } from './modules/consumo/consumoView.js';
 import { clearSession, getSession, isAuthenticated } from './state/sessionStore.js';
 import { escapeHtml } from './utils/formatters.js';
 
@@ -99,6 +100,7 @@ const SECTIONS = [
   { key: 'ventas', label: 'Historial Ventas', icon: 'ventas', roles: ['Admin', 'Vendedor'] },
   { key: 'nav-ops', label: 'OPERACIONES', separator: true, roles: ['Admin', 'Vendedor'] },
   { key: 'caja', label: 'Caja y Turnos', icon: 'caja', roles: ['Admin', 'Vendedor'] },
+  { key: 'consumo', label: 'Consumo Trabajadores', icon: 'usuarios', roles: ['Admin'] },
   { key: 'inventario', label: 'Inventario', icon: 'inventario', roles: ['Admin'] },
   { key: 'kardex', label: 'Kardex', icon: 'kardex', roles: ['Admin'] },
   { key: 'nav-bi', label: 'ANALISIS', separator: true, roles: ['Admin'] },
@@ -117,6 +119,7 @@ const routes = {
   balanza: { render: renderBalanzaSkeleton, hydrate: hydrateBalanzaView },
   ventas: { render: renderVentasSkeleton, hydrate: hydrateVentasView },
   caja: { render: renderCajaSkeleton, hydrate: hydrateCajaView },
+  consumo: { render: renderConsumoSkeleton, hydrate: hydrateConsumoView },
   inventario: { render: renderInventarioSkeleton, hydrate: hydrateInventarioView },
   kardex: { render: renderKardexSkeleton, hydrate: hydrateKardexView },
   reportes: { render: renderReportesSkeleton, hydrate: hydrateReportesView },

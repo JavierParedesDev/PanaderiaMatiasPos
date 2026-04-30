@@ -20,6 +20,7 @@ const masterRoutes = require('./routes/masterRoutes'); // <-- NUEVA IMPORTACIÓN
 const kardexRoutes = require('./routes/kardexRoutes'); // <-- NUEVA IMPORTACIÓN (Auditoría)
 
 const withdrawalRoutes = require('./routes/withdrawalRoutes');
+const staffConsumptionRoutes = require('./routes/staffConsumptionRoutes');
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/maestros', masterRoutes);     // Tablas maestras (Categorías, Suc
 app.use('/api/kardex', kardexRoutes);       // Historial completo de movimientos de inventario
 
 app.use('/api/retiros', withdrawalRoutes);  // Retiros de efectivo durante el turno
+app.use('/api/consumo-personal', staffConsumptionRoutes); // Consumo interno de trabajadores
 
 // 5. MANEJO DE ERRORES PARA RUTAS NO EXISTENTES
 app.use((req, res) => {

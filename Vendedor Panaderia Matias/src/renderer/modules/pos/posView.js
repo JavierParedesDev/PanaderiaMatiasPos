@@ -1,6 +1,7 @@
 import { getProductos } from "../../services/productService.js";
 import { getCategorias } from "../../services/masterService.js";
 import { registrarVenta } from "../../services/saleService.js";
+import { getTrabajadores, registrarConsumoPersonal } from "../../services/staffConsumptionService.js";
 import { formatCurrency, escapeHtml } from "../../utils/formatters.js";
 import { showNotification } from "../../utils/notifications.js";
 import { getSession } from "../../state/sessionStore.js";
@@ -116,6 +117,12 @@ export function renderPosSkeleton() {
         </div>
 
         <!-- Botón Cobrar (VERDE / CUADRADO TOTAL AL FONDO) -->
+                <div class="px-4 pb-3">
+          <button id="internal-consumption-button" class="w-full h-16 bg-cafe/10 hover:bg-cafe text-cafe hover:text-white border border-cafe/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+            Consumo Interno
+          </button>
+        </div>
+
         <button id="pay-button" class="btn-pos-pay-success h-28 flex flex-col items-center justify-center gap-1 active:brightness-90 transition-all font-black italic uppercase" disabled>
            <span class="text-[10px] opacity-60 tracking-[0.3em]">Finalizar Venta</span>
            <span class="text-2xl tracking-tighter" id="pay-button-text">COBRAR $ 0</span>
@@ -145,6 +152,38 @@ export function renderPosSkeleton() {
     </div>
 
     <!-- Modal de confirmación -->
+        <!-- Modal de Consumo Interno -->
+    <div id="internal-consumption-modal" class="hidden fixed inset-0 z-[320] flex items-center justify-center p-4 bg-cafe/90 backdrop-blur-md">
+      <div class="panel w-full max-w-md bg-white p-10 space-y-8 animate-zoomIn">
+        <div>
+          <h2 class="text-2xl font-black text-cafe uppercase italic tracking-tighter">Consumo Interno</h2>
+          <p class="text-[10px] font-bold text-cafe/40 uppercase tracking-[0.25em] mt-2">Asignar ticket actual a trabajador</p>
+        </div>
+        <form id="internal-consumption-form" class="space-y-6">
+          <div class="block space-y-2">
+            <span class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.2em]">Nombre del trabajador</span>
+            <input id="internal-worker-id" type="hidden" required>
+            <div class="relative">
+              <button type="button" id="internal-worker-button" class="w-full h-16 bg-papel border-2 border-borde/40 rounded-2xl px-5 text-sm font-black uppercase tracking-widest outline-none focus:border-caramelo transition-all text-cafe flex items-center justify-between">
+                <span id="internal-worker-label" class="truncate">Selecciona trabajador...</span>
+                <span class="text-lg text-cafe/50">⌄</span>
+              </button>
+              <div id="internal-worker-list" class="hidden absolute z-10 mt-2 w-full max-h-56 overflow-y-auto rounded-2xl border border-borde/40 bg-white shadow-2xl shadow-cafe/20 p-2 space-y-1"></div>
+            </div>
+          </div>
+          <div class="p-5 bg-papel/70 rounded-2xl border border-borde/30">
+            <p class="text-[9px] font-black text-cafe/35 uppercase tracking-[0.25em] mb-1">Total a cuenta del trabajador</p>
+            <p id="internal-consumption-total" class="text-3xl font-black text-cafe">$ 0</p>
+          </div>
+          <div id="internal-consumption-message" class="hidden p-3 rounded-xl text-xs text-center font-bold"></div>
+          <div class="flex gap-4">
+            <button type="button" id="cancel-internal-consumption" class="flex-1 py-4 rounded-xl font-black uppercase text-xs tracking-widest text-cafe/40 hover:bg-papel">Cancelar</button>
+            <button type="submit" id="confirm-internal-consumption" class="flex-[2] py-4 rounded-xl bg-cafe text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-cafe/20">Registrar Consumo</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div id="payment-modal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4 bg-cafe/95 backdrop-blur-xl">
       <div class="panel w-full max-w-md bg-white border-none shadow-[0_0_150px_rgba(0,0,0,0.6)] overflow-hidden text-center p-10 space-y-6 animate-zoomIn">
         <div class="w-24 h-24 bg-verdeok text-white rounded-full flex items-center justify-center text-5xl mx-auto shadow-2xl shadow-verdeok/40 ring-8 ring-verdeok/10 animate-bounce">✓</div>
@@ -231,6 +270,17 @@ export async function hydratePosView() {
   const paymentModal = document.querySelector("#payment-modal");
   const closePaymentModalBtn = document.querySelector("#close-payment-modal");
   const modalTotal = document.querySelector("#modal-payment-total");
+  const internalConsumptionBtn = document.querySelector("#internal-consumption-button");
+  const internalConsumptionModal = document.querySelector("#internal-consumption-modal");
+  const internalConsumptionForm = document.querySelector("#internal-consumption-form");
+  const internalWorkerId = document.querySelector("#internal-worker-id");
+  const internalWorkerButton = document.querySelector("#internal-worker-button");
+  const internalWorkerLabel = document.querySelector("#internal-worker-label");
+  const internalWorkerList = document.querySelector("#internal-worker-list");
+  const internalConsumptionTotal = document.querySelector("#internal-consumption-total");
+  const internalConsumptionMessage = document.querySelector("#internal-consumption-message");
+  const cancelInternalConsumptionBtn = document.querySelector("#cancel-internal-consumption");
+  const confirmInternalConsumptionBtn = document.querySelector("#confirm-internal-consumption");
 
   // Selectores Confirmación
   const confirmModal = document.querySelector("#confirm-modal");
@@ -505,8 +555,9 @@ export async function hydratePosView() {
             <img src="./assets/logo.png" class="w-32 mb-6 grayscale">
             <p class="text-lg font-black uppercase tracking-[0.3em]">Esperando Selección...</p>
          </div>
-       `;
+      `;
       payButton.disabled = true;
+      if (internalConsumptionBtn) internalConsumptionBtn.disabled = true;
       payButtonText.textContent = "COBRAR $ 0";
     } else {
       cartItemsContainer.innerHTML = cart
@@ -558,6 +609,7 @@ export async function hydratePosView() {
         .join("");
 
       payButton.disabled = false;
+      if (internalConsumptionBtn) internalConsumptionBtn.disabled = false;
 
       cartItemsContainer.querySelectorAll("[data-action]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -676,6 +728,115 @@ export async function hydratePosView() {
       }
     }
     return true;
+  }
+
+  function setInternalWorker(id, label) {
+    internalWorkerId.value = id || "";
+    internalWorkerLabel.textContent = label || "Selecciona trabajador...";
+    internalWorkerList.classList.add("hidden");
+  }
+
+  function renderInternalWorkers(trabajadores = []) {
+    if (!trabajadores.length) {
+      internalWorkerList.innerHTML = '<div class="px-4 py-5 text-center text-xs font-bold text-cafe/35">No hay trabajadores creados</div>';
+      setInternalWorker("", "Sin trabajadores creados");
+      return;
+    }
+
+    internalWorkerList.innerHTML = trabajadores.map((trabajador) => {
+      const label = `${trabajador.nombre} ${trabajador.apellido}`;
+      return `
+        <button type="button" class="internal-worker-option w-full text-left px-4 py-3 rounded-xl hover:bg-papel text-sm font-black text-cafe uppercase tracking-widest transition-colors" data-id="${trabajador.id}" data-label="${escapeHtml(label)}">
+          ${escapeHtml(label)}
+        </button>
+      `;
+    }).join("");
+
+    internalWorkerList.querySelectorAll(".internal-worker-option").forEach((option) => {
+      option.addEventListener("click", () => {
+        setInternalWorker(option.dataset.id, option.dataset.label);
+      });
+    });
+
+    setInternalWorker("", "Selecciona trabajador...");
+  }
+
+  async function openInternalConsumptionModal() {
+    if (cart.length === 0) return;
+    if (!currentShift) {
+      showNotification("NO SE PUEDE REGISTRAR CONSUMO SIN TURNO ABIERTO", "error");
+      return;
+    }
+    if (!validateCartStock()) return;
+
+    internalConsumptionMessage?.classList.add("hidden");
+    internalConsumptionTotal.textContent = formatCurrency(getCartTotal());
+    setInternalWorker("", "Cargando trabajadores...");
+    internalWorkerList.innerHTML = "";
+    internalConsumptionModal.classList.remove("hidden");
+
+    try {
+      const response = await getTrabajadores();
+      renderInternalWorkers(response.data || []);
+    } catch (error) {
+      setInternalWorker("", "Error al cargar trabajadores");
+      showNotification(error.message, "error");
+    }
+  }
+
+  function closeInternalConsumptionModal() {
+    internalConsumptionModal?.classList.add("hidden");
+    internalConsumptionForm?.reset();
+    setInternalWorker("", "Selecciona trabajador...");
+    internalConsumptionMessage?.classList.add("hidden");
+  }
+
+  async function processInternalConsumption(idTrabajador) {
+    if (isProcessingSale) return;
+    if (!idTrabajador) {
+      internalConsumptionMessage.textContent = "Selecciona un trabajador.";
+      internalConsumptionMessage.className = "p-3 rounded-xl text-xs text-center font-bold bg-rojoaviso/10 text-rojoaviso";
+      internalConsumptionMessage.classList.remove("hidden");
+      return;
+    }
+    if (!validateCartStock()) return;
+
+    isProcessingSale = true;
+    confirmInternalConsumptionBtn.disabled = true;
+    internalConsumptionBtn.disabled = true;
+    payButton.disabled = true;
+
+    try {
+      await registrarConsumoPersonal({
+        id_trabajador: Number(idTrabajador),
+        id_turno: currentShift?.id,
+        detalle_productos: cart.map((item) => ({
+          id_producto: item.id,
+          cantidad: item.quantity,
+          precio_unitario: item.precio_venta || 0
+        }))
+      });
+
+      cart.forEach((item) => {
+        const product = allProducts.find((p) => p.id === item.id);
+        if (product) {
+          product.stock_actual = Math.max(0, getStock(product) - item.quantity);
+        }
+      });
+
+      cart = [];
+      updateCartUI();
+      closeInternalConsumptionModal();
+      showNotification("CONSUMO INTERNO REGISTRADO", "success");
+    } catch (error) {
+      internalConsumptionMessage.textContent = error.message;
+      internalConsumptionMessage.className = "p-3 rounded-xl text-xs text-center font-bold bg-rojoaviso/10 text-rojoaviso";
+      internalConsumptionMessage.classList.remove("hidden");
+    } finally {
+      isProcessingSale = false;
+      confirmInternalConsumptionBtn.disabled = false;
+      updateCartUI();
+    }
   }
 
   async function printSaleTicket(printData) {
@@ -837,6 +998,19 @@ export async function hydratePosView() {
     }
   });
 
+  internalConsumptionBtn?.addEventListener("click", openInternalConsumptionModal);
+
+  internalWorkerButton?.addEventListener("click", () => {
+    internalWorkerList?.classList.toggle("hidden");
+  });
+
+  cancelInternalConsumptionBtn?.addEventListener("click", closeInternalConsumptionModal);
+
+  internalConsumptionForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await processInternalConsumption(internalWorkerId.value);
+  });
+
   closePaymentModalBtn.addEventListener("click", () => {
     paymentModal.classList.add("hidden");
     searchInput.focus();
@@ -910,3 +1084,5 @@ export async function hydratePosView() {
 
   await loadData();
 }
+
+
