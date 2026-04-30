@@ -1,3 +1,5 @@
+process.env.TZ = 'America/Santiago';
+
 const express = require('express');
 const cors = require('cors');
 // Si decides usar un archivo .env para las claves secretas más adelante
@@ -16,6 +18,8 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const userRoutes = require('./routes/userRoutes');
 const masterRoutes = require('./routes/masterRoutes'); // <-- NUEVA IMPORTACIÓN (Maestros)
 const kardexRoutes = require('./routes/kardexRoutes'); // <-- NUEVA IMPORTACIÓN (Auditoría)
+
+const withdrawalRoutes = require('./routes/withdrawalRoutes');
 
 const app = express();
 
@@ -46,6 +50,8 @@ app.use('/api/inventario', inventoryRoutes); // Consultas de stock local y ajust
 app.use('/api/usuarios', userRoutes);       // Creación y listado de personal
 app.use('/api/maestros', masterRoutes);     // Tablas maestras (Categorías, Sucursales, etc.)
 app.use('/api/kardex', kardexRoutes);       // Historial completo de movimientos de inventario
+
+app.use('/api/retiros', withdrawalRoutes);  // Retiros de efectivo durante el turno
 
 // 5. MANEJO DE ERRORES PARA RUTAS NO EXISTENTES
 app.use((req, res) => {

@@ -96,7 +96,7 @@ const ajustarStock = async (req, res) => {
 
         await client.query(
             `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario)
-             VALUES ($1, $2, 'AJUSTE', $3, $4, NOW(), $5)`,
+             VALUES ($1, $2, 'AJUSTE', $3, $4, timezone('America/Santiago', now()), $5)`,
             [id_producto, id_sucursal, cantidad_ajustada, stock_posterior, id_usuario]
         );
 
@@ -172,7 +172,7 @@ const fijarStockProducto = async (req, res) => {
 
         await client.query(
             `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario)
-             VALUES ($1, $2, 'AJUSTE', $3, $4, NOW(), $5)`,
+             VALUES ($1, $2, 'AJUSTE', $3, $4, timezone('America/Santiago', now()), $5)`,
             [id_producto, id_sucursal, cantidadAjustada, stockObjetivo, id_usuario]
         );
 

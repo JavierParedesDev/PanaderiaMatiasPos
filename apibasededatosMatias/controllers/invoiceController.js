@@ -90,8 +90,8 @@ const ingresarFactura = async (req, res) => {
 
             // Registrar en el Kardex como COMPRA
             await client.query(
-                `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario, referencia_id) 
-                 VALUES ($1, $2, 'COMPRA', $3, $4, NOW(), $5, $6)`,
+                    `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario, referencia_id) 
+                     VALUES ($1, $2, 'COMPRA', $3, $4, timezone('America/Santiago', now()), $5, $6)`,
                 [item.id_producto, id_sucursal, item.cantidad, stock_posterior, id_usuario, id_factura]
             );
         }

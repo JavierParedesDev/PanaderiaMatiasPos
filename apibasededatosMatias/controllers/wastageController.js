@@ -20,7 +20,7 @@ const registrarMerma = async (req, res) => {
 
         await client.query(
             `INSERT INTO mermas (fecha, id_producto, id_sucursal, cantidad, motivo, id_usuario)
-             VALUES (NOW(), $1, $2, $3, $4, $5)`,
+             VALUES (timezone('America/Santiago', now()), $1, $2, $3, $4, $5)`,
             [id_producto, id_sucursal, cantidad, motivo, id_usuario]
         );
 
@@ -39,7 +39,7 @@ const registrarMerma = async (req, res) => {
 
         await client.query(
             `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario)
-             VALUES ($1, $2, 'MERMA', $3, $4, NOW(), $5)`,
+             VALUES ($1, $2, 'MERMA', $3, $4, timezone('America/Santiago', now()), $5)`,
             [id_producto, id_sucursal, -cantidad, stock_posterior, id_usuario]
         );
 

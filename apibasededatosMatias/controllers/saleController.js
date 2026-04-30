@@ -24,7 +24,7 @@ const procesarVenta = async (req, res) => {
 
         const resVenta = await client.query(
             `INSERT INTO ventas_cabecera (folio_interno, fecha, id_usuario, id_sucursal, id_turno, total_venta)
-             VALUES (COALESCE((SELECT MAX(folio_interno) + 1 FROM ventas_cabecera WHERE id_sucursal = $2), 1), NOW(), $1, $2, $3, $4) RETURNING id, folio_interno`,
+             VALUES (COALESCE((SELECT MAX(folio_interno) + 1 FROM ventas_cabecera WHERE id_sucursal = $2), 1), timezone('America/Santiago', now()), $1, $2, $3, $4) RETURNING id, folio_interno`,
             [id_usuario, id_sucursal, id_turno, total_venta]
         );
         const id_venta = resVenta.rows[0].id;
@@ -53,7 +53,7 @@ const procesarVenta = async (req, res) => {
             if (resStock.rows.length === 0) throw new Error(`Stock insuficiente para producto ID ${item.id_producto}`);
 
             await client.query(
-                `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario, referencia_id) VALUES ($1, $2, 'VENTA', $3, $4, NOW(), $5, $6)`,
+                `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario, referencia_id) VALUES ($1, $2, 'VENTA', $3, $4, timezone('America/Santiago', now()), $5, $6)`,
                 [item.id_producto, id_sucursal, -item.cantidad, resStock.rows[0].stock_actual, id_usuario, id_venta]
             );
         }

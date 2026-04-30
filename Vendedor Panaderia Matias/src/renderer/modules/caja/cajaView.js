@@ -1,4 +1,5 @@
 import { getTurnos, cerrarTurno, getResumenTurno } from '../../services/shiftService.js';
+import { getRetiros, registrarRetiro } from '../../services/withdrawalService.js';
 import { getSession } from '../../state/sessionStore.js';
 import { formatCurrency, escapeHtml } from '../../utils/formatters.js';
 import { showNotification } from '../../utils/notifications.js';
@@ -62,6 +63,38 @@ export function renderCajaSkeleton() {
       </div>
     </div>
 
+    <!-- Modal de Retiro -->
+    <div id="retiro-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-tinta/60 backdrop-blur-md">
+      <div class="panel w-full max-w-md bg-papel shadow-2xl border-4 border-white overflow-hidden animate-zoomIn">
+        <div class="p-6 bg-rojoaviso text-white flex items-center justify-between">
+          <h2 class="text-lg font-black uppercase tracking-tighter">Retiro de Efectivo</h2>
+          <button id="cerrar-modal-retiro" class="text-white/60 hover:text-white text-2xl">&times;</button>
+        </div>
+        <form id="retiro-form" class="p-8 space-y-6">
+          <label class="block space-y-2">
+            <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Monto Retirado</span>
+            <div class="relative">
+              <span class="absolute left-5 top-1/2 -translate-y-1/2 text-2xl font-black text-cafe/20">$</span>
+              <input id="monto-retiro" type="number" step="1" min="1" required class="field pl-12 text-3xl font-black text-cafe text-center h-20" placeholder="0">
+            </div>
+          </label>
+
+          <label class="block space-y-2">
+            <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Motivo</span>
+            <input id="motivo-retiro" type="text" required class="field" placeholder="Ej: pago proveedores">
+          </label>
+
+          <label class="block space-y-2">
+            <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">DescripciÃ³n</span>
+            <textarea id="descripcion-retiro" class="field h-24 resize-none" placeholder="Ej: pago de evercrisp"></textarea>
+          </label>
+
+          <div id="retiro-message" class="hidden p-3 rounded-xl text-xs text-center font-bold"></div>
+          <button type="submit" id="btn-confirmar-retiro" class="btn-primary w-full py-5 text-base shadow-xl bg-rojoaviso hover:bg-rojoaviso/90">Registrar Retiro</button>
+        </form>
+      </div>
+    </div>
+
     <!-- Modal de Apertura (Reutilizado) -->
     <div id="open-shift-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-cafe/95 backdrop-blur-md">
       <div class="panel w-full max-w-md bg-papel shadow-2xl border-4 border-white overflow-hidden animate-zoomIn">
@@ -102,6 +135,10 @@ export async function hydrateCajaView() {
   const arqueoForm = document.querySelector('#arqueo-form');
   const btnCerrarModal = document.querySelector('#cerrar-modal-arqueo');
   const messageBox = document.querySelector('#arqueo-message');
+  const retiroModal = document.querySelector('#retiro-modal');
+  const retiroForm = document.querySelector('#retiro-form');
+  const btnCerrarRetiro = document.querySelector('#cerrar-modal-retiro');
+  const retiroMessage = document.querySelector('#retiro-message');
   const backBtn = document.querySelector('#btn-volver-venta');
   let activeShift = null;
 
@@ -111,6 +148,39 @@ export async function hydrateCajaView() {
         document.querySelector('img[src*="logo.png"]');
       if (homeBtn) homeBtn.click();
     });
+  }
+
+  function formatTicketDate(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleString('es-CL');
+  }
+
+  async function imprimirTicketArqueo(resumen, observaciones) {
+    if (!window.electronAPI?.printTicket || !resumen) return;
+
+    const printerName = localStorage.getItem('selected_printer') || '';
+    const result = await window.electronAPI.printTicket({
+      tipo: 'arqueo',
+      printer_name: printerName,
+      cajero: resumen.cajero,
+      fecha_inicio: formatTicketDate(resumen.fecha_inicio),
+      fecha_termino: formatTicketDate(resumen.fecha_termino),
+      monto_apertura: resumen.monto_apertura,
+      ventas_efectivo: resumen.ventas_efectivo,
+      ventas_tarjeta: resumen.ventas_tarjeta,
+      ventas_transferencia: resumen.ventas_transferencia,
+      monto_total: resumen.monto_total,
+      esperado: resumen.esperado,
+      declarado: resumen.declarado,
+      diferencia: resumen.diferencia,
+      cuadrado: resumen.cuadrado,
+      observaciones
+    });
+
+    if (!result?.success) {
+      const printError = result?.error || result?.message || 'No se pudo imprimir el ticket de cierre.';
+      showNotification(`Caja cerrada, pero no se imprimio el arqueo: ${printError}`, 'error');
+    }
   }
 
   async function loadStatus() {
@@ -146,18 +216,44 @@ export async function hydrateCajaView() {
 
       let totalEfectivo = 0;
       let totalTarjeta = 0;
+      let totalTransferencia = 0;
+      let totalRetiros = 0;
+      let retirosTurno = [];
 
       try {
         const resumenRes = await getResumenTurno(miTurno.id);
         if (resumenRes.success && resumenRes.data) {
           totalEfectivo = Number(resumenRes.data.total_efectivo) || 0;
           totalTarjeta = Number(resumenRes.data.total_tarjeta) || 0;
+          totalTransferencia = Number(resumenRes.data.total_transferencia) || 0;
+          totalRetiros = Number(resumenRes.data.total_retiros) || 0;
         }
       } catch (e) {
         console.error("Error al obtener resumen de turno:", e);
       }
 
-      const totalEsperadoEfectivo = Number(miTurno.monto_apertura) + totalEfectivo;
+      try {
+        const retirosRes = await getRetiros({ id_turno: miTurno.id });
+        if (retirosRes.success) {
+          retirosTurno = retirosRes.data || [];
+        }
+      } catch (e) {
+        console.error("Error al obtener retiros:", e);
+      }
+
+      const totalEsperadoEfectivo = Number(miTurno.monto_apertura) + totalEfectivo - totalRetiros;
+      const retiroRows = retirosTurno.map((retiro) => `
+        <div class="flex items-start justify-between gap-4 p-4 rounded-xl bg-papel/50 border border-borde/30">
+          <div class="min-w-0">
+            <p class="text-xs font-black text-cafe uppercase truncate">${escapeHtml(retiro.motivo)}</p>
+            <p class="text-[10px] text-cafe/50 font-bold truncate">${escapeHtml(retiro.descripcion || 'Sin descripciÃ³n')}</p>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-sm font-black text-cafe">${formatCurrency(retiro.monto)}</p>
+            <p class="text-[9px] text-cafe/35 font-bold">${new Date(retiro.fecha).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+        </div>
+      `).join('');
 
       container.innerHTML = `
         <div class="grid gap-8 lg:grid-cols-2">
@@ -185,9 +281,14 @@ export async function hydrateCajaView() {
                 </div>
               </div>
 
-              <button id="btn-preparar-cierre" class="w-full btn-primary bg-verdeok hover:bg-verdeok/90 shadow-xl shadow-verdeok/20 py-5 text-white font-bold">
-                Cerrar Turno Realizar Arqueo
-              </button>
+              <div class="grid grid-cols-2 gap-4">
+                <button id="btn-abrir-retiro" class="btn-primary bg-rojoaviso hover:bg-rojoaviso/90 shadow-xl shadow-rojoaviso/20 py-5 text-white font-bold">
+                  Registrar Retiro
+                </button>
+                <button id="btn-preparar-cierre" class="btn-primary bg-verdeok hover:bg-verdeok/90 shadow-xl shadow-verdeok/20 py-5 text-white font-bold">
+                  Cerrar Turno
+                </button>
+              </div>
             </div>
           </section>
 
@@ -197,25 +298,49 @@ export async function hydrateCajaView() {
             <div class="relative z-10 h-full flex flex-col">
               <h3 class="text-xl font-black uppercase tracking-tighter mb-8">Ventas de este Turno</h3>
               <div class="space-y-6 flex-1">
-                 <div class="grid grid-cols-2 gap-4">
+                 <div class="grid grid-cols-4 gap-4">
                     <div class="p-4 rounded-xl bg-white/5 border border-white/10">
                        <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Efectivo</p>
-                       <p class="text-xl font-black tracking-tighter text-verdeok">${formatCurrency(totalEfectivo)}</p>
+                       <p class="text-xl font-black tracking-tighter text-white">${formatCurrency(totalEfectivo)}</p>
                     </div>
                     <div class="p-4 rounded-xl bg-white/5 border border-white/10">
                        <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Tarjeta</p>
-                       <p class="text-xl font-black tracking-tighter text-white/80">${formatCurrency(totalTarjeta)}</p>
+                       <p class="text-xl font-black tracking-tighter text-[#f8efe1]">${formatCurrency(totalTarjeta)}</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Transfer.</p>
+                       <p class="text-xl font-black tracking-tighter text-[#f8efe1]">${formatCurrency(totalTransferencia)}</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Retiros</p>
+                       <p class="text-xl font-black tracking-tighter text-[#f6d7ad]">${formatCurrency(-totalRetiros)}</p>
                     </div>
                  </div>
 
                  <div class="p-4 rounded-xl bg-white/10 border border-white/20 mt-4">
                     <p class="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1">Total Efectivo a Rendir</p>
-                    <p class="text-3xl font-black tracking-tighter text-caramelo">${formatCurrency(totalEsperadoEfectivo)}</p>
+                    <p class="text-3xl font-black tracking-tighter text-[#f6d7ad]">${formatCurrency(totalEsperadoEfectivo)}</p>
+                    <p class="text-[10px] text-white/35 font-bold mt-1">Apertura + efectivo - retiros</p>
                  </div>
+
               </div>
             </div>
           </section>
         </div>
+
+        <!-- Historial de Retiros -->
+        <section class="panel p-6 bg-white border border-borde/20 shadow-md relative overflow-hidden mt-8">
+          <div class="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h3 class="text-sm font-black text-cafe uppercase tracking-widest">Retiros del Turno</h3>
+              <p class="text-xs text-cafe/50 font-medium">Historial de dinero retirado durante la caja actual.</p>
+            </div>
+            <p class="text-lg font-black text-cafe">${formatCurrency(totalRetiros)}</p>
+          </div>
+          <div class="max-h-64 overflow-y-auto pr-2 space-y-2">
+            ${retiroRows || '<div class="p-4 rounded-xl bg-papel/50 border border-borde/30 text-xs font-bold text-cafe/40 text-center">Sin retiros registrados</div>'}
+          </div>
+        </section>
         
         <!-- Sección de Actualizaciones -->
         <section class="panel p-6 bg-white border border-borde/20 shadow-md relative overflow-hidden mt-8 flex items-center justify-between">
@@ -300,6 +425,13 @@ export async function hydrateCajaView() {
         showNotification('Impresora guardada correctamente.', 'success');
       });
 
+      document.querySelector('#btn-abrir-retiro')?.addEventListener('click', () => {
+        retiroMessage?.classList.add('hidden');
+        retiroForm?.reset();
+        retiroModal?.classList.remove('hidden');
+        setTimeout(() => document.querySelector('#monto-retiro')?.focus(), 100);
+      });
+
       document.querySelector('#btn-preparar-cierre')?.addEventListener('click', () => {
         messageBox?.classList.add('hidden');
         
@@ -346,6 +478,56 @@ export async function hydrateCajaView() {
     messageBox?.classList.add('hidden');
   });
 
+  btnCerrarRetiro?.addEventListener('click', () => {
+    retiroModal?.classList.add('hidden');
+    retiroMessage?.classList.add('hidden');
+  });
+
+  retiroForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const monto = Number(document.querySelector('#monto-retiro').value);
+    const motivo = document.querySelector('#motivo-retiro').value;
+    const descripcion = document.querySelector('#descripcion-retiro').value;
+    const btn = document.querySelector('#btn-confirmar-retiro');
+
+    if (!activeShift?.id) {
+      retiroMessage.textContent = 'No se encontrÃ³ un turno abierto para registrar el retiro.';
+      retiroMessage.className = 'p-3 rounded-xl text-xs text-center font-bold bg-rojoaviso/10 text-rojoaviso mb-4';
+      retiroMessage.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Registrando...';
+
+      await registrarRetiro({
+        id_turno: activeShift.id,
+        monto,
+        motivo,
+        descripcion
+      });
+
+      retiroMessage.textContent = 'Retiro registrado correctamente.';
+      retiroMessage.className = 'p-3 rounded-xl text-xs text-center font-bold bg-verdeok/10 text-verdeok mb-4';
+      retiroMessage.classList.remove('hidden');
+
+      setTimeout(() => {
+        retiroModal?.classList.add('hidden');
+        retiroForm.reset();
+        btn.disabled = false;
+        btn.textContent = 'Registrar Retiro';
+        loadStatus();
+      }, 800);
+    } catch (error) {
+      retiroMessage.textContent = error.message;
+      retiroMessage.className = 'p-3 rounded-xl text-xs text-center font-bold bg-rojoaviso/10 text-rojoaviso mb-4';
+      retiroMessage.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Registrar Retiro';
+    }
+  });
+
   arqueoForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const monto = Number(document.querySelector('#monto-arqueo').value);
@@ -370,6 +552,8 @@ export async function hydrateCajaView() {
       });
 
       const resumen = response.resumen;
+      await imprimirTicketArqueo(resumen, obs);
+
       const detalle = resumen
         ? ` Esperado: ${formatCurrency(resumen.esperado)} | Declarado: ${formatCurrency(resumen.declarado)} | Diferencia: ${formatCurrency(resumen.diferencia)}`
         : '';
@@ -429,3 +613,4 @@ export async function hydrateCajaView() {
 
   await loadStatus();
 }
+

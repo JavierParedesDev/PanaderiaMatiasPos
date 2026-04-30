@@ -92,8 +92,8 @@ const abrirTurno = async (req, res) => {
         if (checkTurno.rows.length > 0) return res.status(400).json({ error: 'Ya tienes un turno abierto.' });
 
         const result = await pool.query(
-            `INSERT INTO turnos_caja (id_usuario, id_sucursal, tipo_turno, monto_apertura, estado) 
-             VALUES ($1, $2, $3, $4, 'Abierto') RETURNING id, fecha_apertura`,
+            `INSERT INTO turnos_caja (id_usuario, id_sucursal, tipo_turno, monto_apertura, estado, fecha_apertura) 
+             VALUES ($1, $2, $3, $4, 'Abierto', timezone('America/Santiago', now())) RETURNING id, fecha_apertura`,
             [id_usuario, id_sucursal, tipo_turno, monto_apertura]
         );
         res.json({ success: true, mensaje: 'Turno abierto', turno: result.rows[0] });
@@ -105,24 +105,82 @@ const abrirTurno = async (req, res) => {
 const cerrarTurno = async (req, res) => {
     const { id_turno, monto_cierre_efectivo_declarado } = req.body;
     try {
-        const ventasEfectivo = await pool.query(
-            `SELECT COALESCE(SUM(vp.monto_pagado), 0) as total_efectivo
-             FROM ventas_pagos vp JOIN ventas_cabecera vc ON vp.id_venta = vc.id JOIN metodos_pago mp ON vp.id_metodo_pago = mp.id
-             WHERE vc.id_turno = $1 AND mp.nombre = 'Efectivo'`, [id_turno]
+        const ventasMetodos = await pool.query(
+            `SELECT mp.nombre as metodo, COALESCE(SUM(vp.monto_pagado), 0) as total
+             FROM ventas_pagos vp 
+             JOIN ventas_cabecera vc ON vp.id_venta = vc.id 
+             JOIN metodos_pago mp ON vp.id_metodo_pago = mp.id
+             WHERE vc.id_turno = $1
+             GROUP BY mp.nombre`,
+            [id_turno]
         );
-        const totalEfectivoSistema = parseFloat(ventasEfectivo.rows[0].total_efectivo);
 
-        const turnoInfo = await pool.query('SELECT monto_apertura FROM turnos_caja WHERE id = $1', [id_turno]);
+        let totalEfectivoSistema = 0;
+        let totalTarjeta = 0;
+        let totalTransferencia = 0;
+
+        ventasMetodos.rows.forEach(row => {
+            const metodo = (row.metodo || '').toLowerCase();
+            const total = parseFloat(row.total);
+
+            if (metodo.includes('transfe')) {
+                totalTransferencia += total;
+            } else if (metodo.includes('tarjeta') || metodo.includes('debito') || metodo.includes('credito')) {
+                totalTarjeta += total;
+            } else {
+                totalEfectivoSistema += total;
+            }
+        });
+
+        const montoTotal = totalEfectivoSistema + totalTarjeta + totalTransferencia;
+
+        const retirosResult = await pool.query(
+            `SELECT COALESCE(SUM(monto), 0) as total_retiros
+             FROM retiros
+             WHERE id_turno = $1`,
+            [id_turno]
+        );
+        const totalRetiros = parseFloat(retirosResult.rows[0].total_retiros);
+
+        const turnoInfo = await pool.query(
+            `SELECT t.monto_apertura, t.fecha_apertura, u.username as nombre_usuario
+             FROM turnos_caja t
+             LEFT JOIN usuarios u ON u.id = t.id_usuario
+             WHERE t.id = $1`,
+            [id_turno]
+        );
         const montoApertura = parseFloat(turnoInfo.rows[0].monto_apertura);
 
-        const efectivoEsperado = montoApertura + totalEfectivoSistema;
+        const efectivoEsperado = montoApertura + totalEfectivoSistema - totalRetiros;
         const diferencia = parseFloat(monto_cierre_efectivo_declarado) - efectivoEsperado;
 
-        await pool.query(
-            `UPDATE turnos_caja SET fecha_cierre = NOW(), ventas_efectivo_sistema = $1, monto_cierre_efectivo_declarado = $2, diferencia_efectivo = $3, estado = 'Cerrado' WHERE id = $4`,
+        const cierreResult = await pool.query(
+            `UPDATE turnos_caja
+             SET fecha_cierre = timezone('America/Santiago', now()), ventas_efectivo_sistema = $1, monto_cierre_efectivo_declarado = $2, diferencia_efectivo = $3, estado = 'Cerrado'
+             WHERE id = $4
+             RETURNING fecha_cierre`,
             [totalEfectivoSistema, monto_cierre_efectivo_declarado, diferencia, id_turno]
         );
-        res.json({ success: true, mensaje: 'Turno cerrado', resumen: { esperado: efectivoEsperado, declarado: monto_cierre_efectivo_declarado, diferencia } });
+
+        res.json({
+            success: true,
+            mensaje: 'Turno cerrado',
+            resumen: {
+                ventas_efectivo: totalEfectivoSistema,
+                ventas_tarjeta: totalTarjeta,
+                ventas_transferencia: totalTransferencia,
+                monto_total: montoTotal,
+                monto_apertura: montoApertura,
+                esperado: efectivoEsperado,
+                declarado: Number(monto_cierre_efectivo_declarado),
+                diferencia,
+                cuadrado: Math.abs(diferencia) < 1,
+                total_retiros: totalRetiros,
+                cajero: turnoInfo.rows[0].nombre_usuario || `Usuario ${req.usuario.id}`,
+                fecha_inicio: turnoInfo.rows[0].fecha_apertura,
+                fecha_termino: cierreResult.rows[0].fecha_cierre
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: 'Error al cerrar el turno.' });
     }
@@ -149,18 +207,29 @@ const getResumenTurno = async (req, res) => {
 
         let totalEfectivo = 0;
         let totalTarjeta = 0;
+        let totalTransferencia = 0;
 
         ventasMetodos.rows.forEach(row => {
             const metodo = (row.metodo || '').toLowerCase();
             const total = parseFloat(row.total);
-            if (metodo.includes('tarjeta') || metodo.includes('debito') || metodo.includes('credito') || metodo.includes('transfe')) {
+            if (metodo.includes('transfe')) {
+                totalTransferencia += total;
+            } else if (metodo.includes('tarjeta') || metodo.includes('debito') || metodo.includes('credito')) {
                 totalTarjeta += total;
             } else {
                 totalEfectivo += total;
             }
         });
 
-        const efectivoEsperado = montoApertura + totalEfectivo;
+        const retirosResult = await pool.query(
+            `SELECT COALESCE(SUM(monto), 0) as total_retiros
+             FROM retiros
+             WHERE id_turno = $1`,
+            [id]
+        );
+        const totalRetiros = parseFloat(retirosResult.rows[0].total_retiros);
+
+        const efectivoEsperado = montoApertura + totalEfectivo - totalRetiros;
 
         res.json({ 
             success: true, 
@@ -169,6 +238,8 @@ const getResumenTurno = async (req, res) => {
                 monto_apertura: montoApertura,
                 total_efectivo: totalEfectivo,
                 total_tarjeta: totalTarjeta,
+                total_transferencia: totalTransferencia,
+                total_retiros: totalRetiros,
                 total_esperado_efectivo: efectivoEsperado
             } 
         });
