@@ -1,6 +1,6 @@
 {
   "name": "vendedor-panaderia-matias",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Terminal de ventas para el personal de PanaderÃ­a MatÃ­as.",
   "main": "main.js",
   "repository": {
@@ -93,4 +93,3 @@
     "electron-updater": "^6.8.3"
   }
 }
-
