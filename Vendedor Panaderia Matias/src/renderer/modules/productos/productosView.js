@@ -102,6 +102,25 @@ export function renderProductosSkeleton() {
               </div>
             </div>
 
+            <!-- Configuración de Promoción -->
+            <div class="p-5 rounded-2xl bg-caramelo/5 border border-caramelo/20 space-y-4">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">🏷️</span>
+                <p class="text-xs font-black uppercase tracking-widest text-caramelo">Configuración de Promoción (Opcional)</p>
+              </div>
+              <div class="grid gap-5 md:grid-cols-2">
+                <div>
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-cafe/50 mb-2">Cantidad para Promo (ej: 2)</label>
+                  <input id="producto-cantidad-promo" type="number" step="1" class="field" placeholder="0">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-cafe/50 mb-2">Precio de la Promo (ej: 1000)</label>
+                  <input id="producto-precio-promo" type="number" step="0.01" class="field" placeholder="0.00">
+                </div>
+              </div>
+              <p class="text-[9px] text-cafe/40 italic">* Si se configura, el sistema aplicará este precio al alcanzar la cantidad. El resto se cobra a precio normal.</p>
+            </div>
+
             <!-- Pesable Toggle -->
             <div class="flex items-center justify-between p-4 rounded-2xl bg-crema/30 border border-borde/30">
               <div>
@@ -303,6 +322,8 @@ export async function hydrateProductosView() {
       document.querySelector('#producto-precio').value = producto.precio_venta ?? '';
       document.querySelector('#producto-categoria').value = producto.id_categoria ?? '';
       document.querySelector('#producto-impuesto').value = producto.impuesto_especifico ?? 0;
+      document.querySelector('#producto-cantidad-promo').value = producto.cantidad_promo ?? 0;
+      document.querySelector('#producto-precio-promo').value = producto.precio_promo ?? 0;
       const pesableCheck = document.querySelector('#producto-pesable');
       if (pesableCheck) {
         pesableCheck.checked = !!producto.pesable;
@@ -312,6 +333,8 @@ export async function hydrateProductosView() {
     } else {
       form?.reset();
       document.querySelector('#producto-id').value = '';
+      document.querySelector('#producto-cantidad-promo').value = 0;
+      document.querySelector('#producto-precio-promo').value = 0;
       const pesableCheck = document.querySelector('#producto-pesable');
       if (pesableCheck) pesableCheck.checked = false;
       const label = document.querySelector('#pesable-label');
@@ -455,9 +478,7 @@ export async function hydrateProductosView() {
   closeModalBtn?.addEventListener('click', closeModal);
   cancelModalBtn?.addEventListener('click', closeModal);
 
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
-  });
+  /* El modal ya no se cierra al hacer clic fuera para evitar pérdida de datos */
 
   confirmCancel?.addEventListener('click', closeConfirmModal);
   confirmAccept?.addEventListener('click', async () => {
@@ -507,6 +528,8 @@ export async function hydrateProductosView() {
       precio_venta: Number(document.querySelector('#producto-precio')?.value || 0),
       id_categoria: Number(document.querySelector('#producto-categoria')?.value || 0) || null,
       impuesto_especifico: Number(document.querySelector('#producto-impuesto')?.value || 0),
+      cantidad_promo: Number(document.querySelector('#producto-cantidad-promo')?.value || 0),
+      precio_promo: Number(document.querySelector('#producto-precio-promo')?.value || 0),
       pesable: document.querySelector('#producto-pesable')?.checked === true
     };
 

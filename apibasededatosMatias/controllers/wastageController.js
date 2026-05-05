@@ -6,7 +6,7 @@ const registrarMerma = async (req, res) => {
     const id_sucursal = req.usuario.id_sucursal;
 
     if (!Number.isInteger(Number(id_producto)) || Number(id_producto) <= 0) {
-        return res.status(400).json({ success: false, error: 'Debe indicar un producto vÃ¡lido.' });
+        return res.status(400).json({ success: false, error: 'Debe indicar un producto válido.' });
     }
 
     if (!Number.isFinite(Number(cantidad)) || Number(cantidad) <= 0) {

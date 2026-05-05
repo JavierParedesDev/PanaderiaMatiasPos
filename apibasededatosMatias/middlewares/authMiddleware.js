@@ -24,6 +24,10 @@ const verificarAuth = (req, res, next) => {
             return res.status(401).json({ error: 'Token invalido o expirado. Inicie sesion nuevamente.' });
         }
 
+        if (decoded?.rol !== 'Admin' && (!decoded?.id_sucursal || decoded.id_sucursal <= 0)) {
+            decoded.id_sucursal = 1;
+        }
+
         req.usuario = decoded;
         next();
     });

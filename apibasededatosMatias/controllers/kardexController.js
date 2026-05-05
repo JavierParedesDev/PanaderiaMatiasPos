@@ -10,7 +10,7 @@ const resolveSucursalId = (req, fallbackSucursal) => {
 };
 
 /**
- * Obtener historial detallado de un producto específico
+ * Obtener historial detallado de un producto espec�fico
  */
 const getHistorialProducto = async (req, res) => {
     if (req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Solo Admin puede ver el Kardex.' });
@@ -41,15 +41,11 @@ const getTodosLosMovimientos = async (req, res) => {
     if (req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Solo Admin puede ver el Kardex.' });
 
     const id_sucursal = resolveSucursalId(req);
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, parseInt(req.query.limit) || 30);
-    const offset = (page - 1) * limit;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const pageSize = 15;
+    const offset = (page - 1) * pageSize;
 
     try {
-        const countResult = await pool.query('SELECT COUNT(*) FROM kardex WHERE id_sucursal = $1', [id_sucursal]);
-        const totalItems = parseInt(countResult.rows[0].count);
-        const totalPages = Math.max(1, Math.ceil(totalItems / limit));
-
         const query = `
             SELECT
                 k.id,
@@ -69,18 +65,28 @@ const getTodosLosMovimientos = async (req, res) => {
             ORDER BY k.fecha DESC
             LIMIT $2 OFFSET $3
         `;
-        const result = await pool.query(query, [id_sucursal, limit, offset]);
-        res.json({ 
-            success: true, 
-            id_sucursal, 
-            data: result.rows,
+        const [result, countResult] = await Promise.all([
+            pool.query(query, [id_sucursal, pageSize, offset]),
+            pool.query(
+                'SELECT COUNT(*)::int AS total FROM kardex WHERE id_sucursal = $1',
+                [id_sucursal]
+            )
+        ]);
+
+        const totalItems = Number(countResult.rows[0]?.total || 0);
+        const totalPages = Math.max(Math.ceil(totalItems / pageSize), 1);
+
+        res.json({
+            success: true,
+            id_sucursal,
             page,
             total_pages: totalPages,
-            total_items: totalItems
+            total_items: totalItems,
+            data: result.rows
         });
     } catch (error) {
         console.error('Error Kardex:', error);
-        res.status(500).json({ success: false, error: 'Error al obtener auditoría de movimientos.' });
+        res.status(500).json({ success: false, error: 'Error al obtener auditor�a de movimientos.' });
     }
 };
 

@@ -1,7 +1,10 @@
 import { getRankingProductos, getReporteUtilidadMensual, getReporteCigarros } from '../../services/reportService.js';
+import { getTurnos } from '../../services/shiftService.js';
 import { formatCurrency, escapeHtml } from '../../utils/formatters.js';
 
 let currentTab = 'ranking';
+let selectedTurnoId = '';
+let selectedTurnoTipo = '';
 
 export function renderReportesSkeleton() {
   return `
@@ -116,17 +119,56 @@ async function renderUtilidad() {
 async function renderCigarros() {
   const container = document.querySelector('#reports-content');
   try {
-    const res = await getReporteCigarros();
+    const filtros = selectedTurnoId
+      ? { id_turno: selectedTurnoId }
+      : (selectedTurnoTipo ? { tipo_turno: selectedTurnoTipo } : {});
+    const [turnosRes, res] = await Promise.all([
+      getTurnos(),
+      getReporteCigarros(filtros)
+    ]);
     const data = res.data;
+    const turnos = turnosRes.data || [];
+    const opcionesTurno = [
+      { value: '', label: 'Hoy (turno actual)' },
+      ...turnos.map(turno => ({
+        value: String(turno.id),
+        label: `Turno #${turno.id} · ${new Date(turno.fecha_apertura).toLocaleString('es-CL')}`
+      }))
+    ];
 
     container.innerHTML = `
       <div class="panel bg-white shadow-xl overflow-hidden border-t-4 border-t-azulaviso">
         <div class="p-6 border-b border-borde/30 flex items-center justify-between">
           <div>
             <h2 class="text-xl font-bold text-[#2d221b]">Control Específico de Tabacos</h2>
-            <p class="text-xs text-cafe/50 mt-1">Seguimiento de ventas de cigarrillos del día de hoy.</p>
+            <p class="text-xs text-cafe/50 mt-1">Seguimiento de ventas de cigarrillos por turno (no se venden sueltos).</p>
           </div>
           <div class="text-2xl">🚬</div>
+        </div>
+        <div class="px-6 pt-4 space-y-4">
+          <div>
+            <label class="text-[10px] font-black uppercase tracking-widest text-cafe/50">Filtrar por turno</label>
+            <div class="mt-2 flex flex-wrap gap-3 items-center">
+              <select id="cigarros-turno" class="h-10 px-4 rounded-xl border border-borde bg-white text-sm font-semibold text-cafe">
+                ${opcionesTurno.map(op => `
+                  <option value="${op.value}" ${op.value === String(selectedTurnoId) ? 'selected' : ''}>${escapeHtml(op.label)}</option>
+                `).join('')}
+              </select>
+              <span class="text-[11px] text-cafe/50 font-bold">${selectedTurnoId ? `Turno seleccionado #${selectedTurnoId}` : 'Mostrando turno actual'}</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] font-black uppercase tracking-widest text-cafe/50">Filtrar por tipo de turno</label>
+            <div class="mt-2 flex flex-wrap gap-3 items-center">
+              <select id="cigarros-turno-tipo" class="h-10 px-4 rounded-xl border border-borde bg-white text-sm font-semibold text-cafe">
+                <option value="" ${selectedTurnoTipo === '' ? 'selected' : ''}>Todos</option>
+                <option value="Mañana" ${selectedTurnoTipo === 'Mañana' ? 'selected' : ''}>Mañana</option>
+                <option value="Tarde" ${selectedTurnoTipo === 'Tarde' ? 'selected' : ''}>Tarde</option>
+                <option value="Unico" ${selectedTurnoTipo === 'Unico' ? 'selected' : ''}>Único</option>
+              </select>
+              <span class="text-[11px] text-cafe/50 font-bold">${selectedTurnoTipo ? `Tipo: ${escapeHtml(selectedTurnoTipo)}` : 'Todos los tipos de turno'}</span>
+            </div>
+          </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left">
@@ -144,12 +186,34 @@ async function renderCigarros() {
                   <td class="px-6 py-4 text-center font-bold text-azulaviso">${p.unidades_vendidas} uds</td>
                   <td class="px-6 py-4 text-right font-black text-cafe">${formatCurrency(p.total_recaudado)}</td>
                 </tr>
-              `).join('') : '<tr><td colspan="3" class="p-10 text-center italic text-cafe/30 uppercase font-black tracking-widest text-xs">No se han vendido cigarrillos hoy</td></tr>'}
+              `).join('') : '<tr><td colspan="3" class="p-10 text-center italic text-cafe/30 uppercase font-black tracking-widest text-xs">No se han vendido cigarrillos en este turno</td></tr>'}
             </tbody>
           </table>
         </div>
       </div>
     `;
+
+    const selectTurno = document.querySelector('#cigarros-turno');
+    if (selectTurno) {
+      selectTurno.addEventListener('change', async (event) => {
+        selectedTurnoId = event.target.value;
+        if (selectedTurnoId) {
+          selectedTurnoTipo = '';
+        }
+        await renderCigarros();
+      });
+    }
+
+    const selectTurnoTipo = document.querySelector('#cigarros-turno-tipo');
+    if (selectTurnoTipo) {
+      selectTurnoTipo.addEventListener('change', async (event) => {
+        selectedTurnoTipo = event.target.value;
+        if (selectedTurnoTipo) {
+          selectedTurnoId = '';
+        }
+        await renderCigarros();
+      });
+    }
   } catch (e) {
     container.innerHTML = `<div class="panel p-10 text-center text-rojoaviso font-bold bg-white italic">${e.message}</div>`;
   }

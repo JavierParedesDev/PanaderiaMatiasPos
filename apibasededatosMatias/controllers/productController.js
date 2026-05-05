@@ -19,6 +19,24 @@ const parseOptionalInteger = (value) => {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
+const parsePositiveNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const resolveUserId = (req) => {
+    const rawUserId = req.body?.id_usuario
+        ?? req.body?.idUsuario
+        ?? req.body?.usuario_id
+        ?? req.usuario?.id_usuario
+        ?? req.usuario?.id
+        ?? req.usuario?.usuario_id
+        ?? null;
+
+    const numericUserId = Number(rawUserId);
+    return Number.isFinite(numericUserId) ? numericUserId : null;
+};
+
 const normalizeLabelNetName = (nombreEtiqueta, nombreProducto) => {
     const source = (nombreEtiqueta || nombreProducto || '').trim().toUpperCase();
     return source.slice(0, 120) || null;
@@ -383,8 +401,8 @@ const eliminarDuplicadosBalanza = async (req, res) => {
 };
 
 /**
- * Obtener catálogo de productos
- * Incluye cálculos de utilidad y margen
+ * Obtener cat logo de productos
+ * Incluye c lculos de utilidad y margen
  */
 const getProductos = async (req, res) => {
     const id_sucursal = resolveSucursalId(req);
@@ -404,6 +422,8 @@ const getProductos = async (req, res) => {
                 p.impuesto_especifico,
                 p.activo,
                 p.pesable,
+                p.cantidad_promo,
+                p.precio_promo,
                 p.plu_balanza,
                 p.nombre_etiqueta,
                 p.activo_balanza,
@@ -424,7 +444,7 @@ const getProductos = async (req, res) => {
         res.json({ success: true, id_sucursal, cantidad: result.rowCount, data: result.rows });
     } catch (error) {
         console.error('Error al obtener productos:', error);
-        res.status(500).json({ success: false, error: 'Error al obtener el catálogo.' });
+        res.status(500).json({ success: false, error: 'Error al obtener el cat logo.' });
     }
 };
 
@@ -621,7 +641,9 @@ const crearProducto = async (req, res) => {
         pesable,
         plu_balanza,
         nombre_etiqueta,
-        activo_balanza
+        activo_balanza,
+        cantidad_promo,
+        precio_promo
     } = req.body;
 
     try {
@@ -629,9 +651,10 @@ const crearProducto = async (req, res) => {
             `INSERT INTO productos (
                 codigo_interno, codigo_barra_externo, nombre, unidad,
                 precio_costo, precio_venta, id_categoria, impuesto_especifico,
-                pesable, plu_balanza, nombre_etiqueta, activo_balanza
+                pesable, plu_balanza, nombre_etiqueta, activo_balanza,
+                cantidad_promo, precio_promo
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
             [
                 codigo_interno,
                 codigo_barra_externo,
@@ -644,13 +667,15 @@ const crearProducto = async (req, res) => {
                 normalizeBoolean(pesable),
                 parseOptionalInteger(plu_balanza),
                 normalizeLabelNetName(nombre_etiqueta, nombre),
-                normalizeBoolean(activo_balanza)
+                normalizeBoolean(activo_balanza),
+                parseOptionalInteger(cantidad_promo) || 0,
+                Number(precio_promo) || 0
             ]
         );
         res.status(201).json({ success: true, mensaje: 'Producto creado exitosamente.', producto: result.rows[0] });
     } catch (error) {
         console.error('Error al crear producto:', error);
-        res.status(500).json({ success: false, error: 'Error al crear producto. Verifique si el código o PLU ya existe.' });
+        res.status(500).json({ success: false, error: 'Error al crear producto. Verifique si el c digo o PLU ya existe.' });
     }
 };
 
@@ -675,7 +700,9 @@ const actualizarProducto = async (req, res) => {
         pesable,
         plu_balanza,
         nombre_etiqueta,
-        activo_balanza
+        activo_balanza,
+        cantidad_promo,
+        precio_promo
     } = req.body;
 
     try {
@@ -692,8 +719,10 @@ const actualizarProducto = async (req, res) => {
                  pesable = $9,
                  plu_balanza = $10,
                  nombre_etiqueta = $11,
-                 activo_balanza = $12
-             WHERE id = $13 RETURNING *`,
+                 activo_balanza = $12,
+                 cantidad_promo = $13,
+                 precio_promo = $14
+             WHERE id = $15 RETURNING *`,
             [
                 codigo_interno,
                 codigo_barra_externo,
@@ -707,6 +736,8 @@ const actualizarProducto = async (req, res) => {
                 parseOptionalInteger(plu_balanza),
                 normalizeLabelNetName(nombre_etiqueta, nombre),
                 normalizeBoolean(activo_balanza),
+                parseOptionalInteger(cantidad_promo) || 0,
+                Number(precio_promo) || 0,
                 id
             ]
         );
@@ -723,7 +754,7 @@ const actualizarProducto = async (req, res) => {
 };
 
 /**
- * Eliminación Física (DELETE)
+ * Eliminaci n F sica (DELETE)
  */
 const eliminarProducto = async (req, res) => {
     if (req.usuario.rol !== 'Admin') {
@@ -749,7 +780,156 @@ const eliminarProducto = async (req, res) => {
             });
         }
 
-        res.status(500).json({ success: false, error: 'Error interno al procesar la eliminación.' });
+        res.status(500).json({ success: false, error: 'Error interno al procesar la eliminaci n.' });
+    }
+};
+
+const registrarIngresoProducto = async (req, res) => {
+    const id_producto = parseOptionalInteger(req.body.id_producto);
+    const id_sucursal = parseOptionalInteger(req.body.id_sucursal);
+    const cantidadIngreso = parsePositiveNumber(req.body.cantidadIngreso);
+    const numeroFactura = String(req.body.numeroFactura || req.body.comprobanteMov || '').trim() || null;
+    const id_usuario = resolveUserId(req);
+
+    if (!id_producto || !id_sucursal || !cantidadIngreso) {
+        return res.status(400).json({ success: false, error: 'Datos incompletos para registrar el ingreso.' });
+    }
+
+    if (!id_usuario) {
+        console.warn('[Ingreso] id_usuario no disponible', { body: req.body, usuario: req.usuario });
+        return res.status(400).json({ success: false, error: 'id_usuario requerido para registrar el ingreso.' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const stockResult = await client.query(
+            `INSERT INTO inventarios (id_producto, id_sucursal, stock_actual)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (id_producto, id_sucursal)
+             DO UPDATE SET stock_actual = inventarios.stock_actual + EXCLUDED.stock_actual
+             RETURNING stock_actual`,
+            [id_producto, id_sucursal, cantidadIngreso]
+        );
+
+        const stockPosterior = Number(stockResult.rows[0]?.stock_actual ?? cantidadIngreso);
+
+        await client.query(
+            `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario, referencia_id)
+             VALUES ($1, $2, 'INGRESO', $3, $4, timezone('America/Santiago', now()), $5, $6)`,
+            [id_producto, id_sucursal, cantidadIngreso, stockPosterior, id_usuario, null]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true, mensaje: 'Ingreso registrado correctamente.' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error al registrar ingreso:', error);
+        res.status(500).json({ success: false, error: error.message || 'Error al registrar ingreso.' });
+    } finally {
+        client.release();
+    }
+};
+
+const registrarTrasladoProducto = async (req, res) => {
+    const id_producto = parseOptionalInteger(req.body.id_producto);
+    const id_sucursalOrigen = parseOptionalInteger(req.body.id_sucursalOrigen);
+    const id_sucursalDestino = parseOptionalInteger(req.body.id_sucursalDestino);
+    const cantidadMov = parsePositiveNumber(req.body.cantidadMov);
+    const comprobanteMov = String(req.body.comprobanteMov || '').trim() || null;
+    const id_usuario = resolveUserId(req);
+
+    if (!id_producto || !id_sucursalOrigen || !id_sucursalDestino || !cantidadMov) {
+        return res.status(400).json({ success: false, error: 'Datos incompletos para el traslado.' });
+    }
+
+    if (!id_usuario) {
+        console.warn('[Traslado] id_usuario no disponible', { body: req.body, usuario: req.usuario });
+        return res.status(400).json({ success: false, error: 'id_usuario requerido para registrar el traslado.' });
+    }
+
+    if (id_sucursalOrigen === id_sucursalDestino) {
+        return res.status(400).json({ success: false, error: 'La sucursal de origen y destino deben ser distintas.' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const stockOrigenResult = await client.query(
+            `SELECT stock_actual
+             FROM inventarios
+             WHERE id_producto = $1 AND id_sucursal = $2
+             FOR UPDATE`,
+            [id_producto, id_sucursalOrigen]
+        );
+
+        const stockOrigen = Number(stockOrigenResult.rows[0]?.stock_actual ?? 0);
+        if (stockOrigen < cantidadMov) {
+            throw new Error(`Stock insuficiente en sucursal origen. Disponible: ${stockOrigen}.`);
+        }
+
+        const stockOrigenUpdate = await client.query(
+            `UPDATE inventarios
+             SET stock_actual = stock_actual - $1
+             WHERE id_producto = $2 AND id_sucursal = $3
+             RETURNING stock_actual`,
+            [cantidadMov, id_producto, id_sucursalOrigen]
+        );
+
+        const stockOrigenPosterior = Number(stockOrigenUpdate.rows[0]?.stock_actual ?? stockOrigen - cantidadMov);
+
+        const stockDestinoUpdate = await client.query(
+            `INSERT INTO inventarios (id_producto, id_sucursal, stock_actual)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (id_producto, id_sucursal)
+             DO UPDATE SET stock_actual = inventarios.stock_actual + EXCLUDED.stock_actual
+             RETURNING stock_actual`,
+            [id_producto, id_sucursalDestino, cantidadMov]
+        );
+
+        const stockDestinoPosterior = Number(stockDestinoUpdate.rows[0]?.stock_actual ?? cantidadMov);
+
+        await client.query(
+            `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario, referencia_id)
+             VALUES ($1, $2, 'TRASLADO', $3, $4, timezone('America/Santiago', now()), $5, $6)`,
+            [id_producto, id_sucursalOrigen, -cantidadMov, stockOrigenPosterior, id_usuario, comprobanteMov]
+        );
+
+        await client.query(
+            `INSERT INTO kardex (id_producto, id_sucursal, tipo_movimiento, cantidad, stock_posterior, fecha, id_usuario, referencia_id)
+             VALUES ($1, $2, 'TRASLADO', $3, $4, timezone('America/Santiago', now()), $5, $6)`,
+            [id_producto, id_sucursalDestino, cantidadMov, stockDestinoPosterior, id_usuario, comprobanteMov]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true, mensaje: 'Traslado registrado correctamente.' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error al registrar traslado:', error);
+        res.status(500).json({ success: false, error: error.message || 'Error al registrar traslado.' });
+    } finally {
+        client.release();
+    }
+};
+
+const runMigration = async (req, res) => {
+    if (req.usuario.rol !== 'Admin') {
+        return res.status(403).json({ error: 'Acceso denegado.' });
+    }
+    try {
+        await pool.query(`
+            ALTER TABLE productos 
+            ADD COLUMN IF NOT EXISTS cantidad_promo INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS precio_promo NUMERIC(12,2) DEFAULT 0;
+        `);
+        res.json({ success: true, mensaje: 'Migración ejecutada con éxito (columnas cantidad_promo y precio_promo añadidas).' });
+    } catch (error) {
+        console.error('Error en migración:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -763,5 +943,8 @@ module.exports = {
     importarProductosLabelNet,
     crearProducto,
     actualizarProducto,
-    eliminarProducto
+    eliminarProducto,
+    registrarIngresoProducto,
+    registrarTrasladoProducto,
+    runMigration
 };

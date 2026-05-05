@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const bcrypt = require('bcrypt'); // LibrerÃ­a para hashear contraseÃ±as
+const bcrypt = require('bcrypt'); // Librería para hashear contraseñas
 
 // Crear un nuevo usuario (Solo Administradores)
 const crearUsuario = async (req, res) => {
@@ -11,7 +11,7 @@ const crearUsuario = async (req, res) => {
     const { username, password, id_rol, id_sucursal } = req.body;
 
     try {
-        // Encriptamos la contraseÃ±a (nadie podrÃ¡ verla en la base de datos)
+        // Encriptamos la contraseña (nadie podrá verla en la base de datos)
         const saltRounds = 10;
         const password_hash = await bcrypt.hash(password, saltRounds);
 
@@ -24,7 +24,7 @@ const crearUsuario = async (req, res) => {
         res.status(201).json({ success: true, mensaje: 'Usuario creado exitosamente', usuario: result.rows[0] });
     } catch (error) {
         console.error('Error al crear usuario:', error);
-        if (error.code === '23505') { // CÃ³digo de error de PostgreSQL para "duplicado"
+        if (error.code === '23505') { // Código de error de PostgreSQL para "duplicado"
             return res.status(400).json({ success: false, error: 'El nombre de usuario ya existe.' });
         }
         res.status(500).json({ success: false, error: 'Error interno al crear el usuario.' });

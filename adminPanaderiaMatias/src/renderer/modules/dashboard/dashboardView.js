@@ -35,13 +35,14 @@ export async function hydrateDashboardView() {
   const container = document.querySelector('#dashboard-content');
   if (!container) return;
 
-  try {
-    const response = await getDashboard();
-    const data = response.data;
-    const { kpis, alertasStock, ultimasVentas, graficoVentas } = data;
+  const renderDashboard = async () => {
+    try {
+      const response = await getDashboard();
+      const data = response.data;
+  const { kpis, alertasStock, ultimasVentas, graficoVentas, graficoMensual } = data;
 
     // Generar gráfico SVG simple
-    const maxVenta = Math.max(...graficoVentas.map(d => d.total), 100000);
+  const maxVenta = Math.max(...graficoVentas.map(d => d.total), 100000);
     const chartHeight = 120;
     const bars = graficoVentas.map((d, i) => {
       const h = (d.total / maxVenta) * chartHeight;
@@ -61,15 +62,42 @@ export async function hydrateDashboardView() {
       `;
     }).join('');
 
-    container.innerHTML = `
+    const monthlyMax = Math.max(...(graficoMensual || []).map(d => d.total), 100000);
+    const monthlyBars = (graficoMensual || []).map((d) => {
+      const h = (d.total / monthlyMax) * chartHeight;
+      return `
+        <div class="flex flex-col items-center justify-end h-full group" style="width: 6%">
+          <div class="relative w-full px-1 flex flex-col items-center justify-end h-full">
+            <div class="absolute -top-6 opacity-0 group-hover:opacity-100 transition-opacity bg-caramelo text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
+              ${formatCurrency(d.total)}
+            </div>
+            <div class="w-full bg-caramelo/10 rounded-t-lg transition-all duration-500 hover:bg-caramelo/30" style="height: ${h}px"></div>
+          </div>
+          <p class="mt-2 text-[9px] font-bold text-cafe/30 uppercase tracking-tighter">${new Date(d.dia).getDate()}</p>
+        </div>
+      `;
+    }).join('');
+
+      container.innerHTML = `
       <!-- KPIs -->
-      <div class="grid gap-6 md:grid-cols-3">
+      <div class="grid gap-6 md:grid-cols-4">
         <article class="panel p-6 bg-white border-b-4 border-b-cafe/20">
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl bg-crema flex items-center justify-center text-2xl">💰</div>
             <div>
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-cafe/40">Ventas del Día</p>
               <p class="text-2xl font-black text-cafe">${formatCurrency(kpis.ventasTotales)}</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel p-6 bg-white border-b-4 border-b-caramelo/20">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-crema flex items-center justify-center text-2xl">🗓️</div>
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-cafe/40">Ventas del Mes</p>
+              <p class="text-2xl font-black text-caramelo">${formatCurrency(kpis.ventasMensuales)}</p>
+              <p class="text-[10px] font-bold text-cafe/40 uppercase tracking-[0.2em]">${kpis.transaccionesMensuales || 0} transacciones</p>
             </div>
           </div>
         </article>
@@ -108,7 +136,20 @@ export async function hydrateDashboardView() {
         </div>
       </section>
 
-      <div class="grid gap-6 md:grid-cols-2">
+      <!-- Gráfico de Ventas Mensual -->
+      <section class="panel p-8 bg-white">
+        <div class="flex items-center justify-between mb-10">
+          <div>
+            <h2 class="text-xl font-black text-[#2d221b]">Ventas del Mes</h2>
+            <p class="text-xs text-[#705f52]">Ventas diarias del mes en curso.</p>
+          </div>
+        </div>
+        <div class="flex items-end justify-between h-40 border-b border-borde/50 pb-2">
+          ${monthlyBars || '<p class="w-full text-center text-cafe/20 italic pb-10">Sin datos del mes.</p>'}
+        </div>
+      </section>
+
+  <div class="grid gap-6 md:grid-cols-2">
         <!-- Alertas de Stock -->
         <section class="panel p-6 bg-white">
           <div class="flex items-center justify-between mb-6 border-b border-borde/30 pb-4">
@@ -154,13 +195,20 @@ export async function hydrateDashboardView() {
       </div>
     </div>
   `;
-  } catch (error) {
-    console.error('Error dashboard:', error);
-    container.innerHTML = `
+    } catch (error) {
+      console.error('Error dashboard:', error);
+      container.innerHTML = `
       <div class="panel p-8 text-center bg-white border-rojoaviso/20">
         <p class="text-rojoaviso font-bold">Error de sincronización</p>
         <p class="text-sm text-[#7b6859] mt-2">${escapeHtml(error.message)}</p>
       </div>
     `;
+    }
+  };
+
+  await renderDashboard();
+  if (window._dashboardInterval) {
+    clearInterval(window._dashboardInterval);
   }
+  window._dashboardInterval = setInterval(renderDashboard, 30000);
 }

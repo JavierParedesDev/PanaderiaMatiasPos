@@ -2,11 +2,11 @@ process.env.TZ = 'America/Santiago';
 
 const express = require('express');
 const cors = require('cors');
-// Si decides usar un archivo .env para las claves secretas m√°s adelante
+// Si decides usar un archivo .env para las claves secretas m·s adelante
 // const dotenv = require('dotenv'); 
 // dotenv.config();
 
-// 1. IMPORTACI√ìN DE RUTAS
+// 1. IMPORTACI”N DE RUTAS
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const saleRoutes = require('./routes/saleRoutes');
@@ -16,40 +16,43 @@ const wastageRoutes = require('./routes/wastageRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const userRoutes = require('./routes/userRoutes');
-const masterRoutes = require('./routes/masterRoutes'); // <-- NUEVA IMPORTACI√ìN (Maestros)
-const kardexRoutes = require('./routes/kardexRoutes'); // <-- NUEVA IMPORTACI√ìN (Auditor√≠a)
+const masterRoutes = require('./routes/masterRoutes'); // <-- NUEVA IMPORTACI”N (Maestros)
+const kardexRoutes = require('./routes/kardexRoutes'); // <-- NUEVA IMPORTACI”N (AuditorÌa)
 
 const withdrawalRoutes = require('./routes/withdrawalRoutes');
 const staffConsumptionRoutes = require('./routes/staffConsumptionRoutes');
+const cashRoutes = require('./routes/cashRoutes');
 
 const app = express();
 
 // 2. MIDDLEWARES GLOBALES
-// CORS permite que tu aplicaci√≥n frontend se conecte desde otro dominio o IP
+// CORS permite que tu aplicaciÛn frontend se conecte desde otro dominio o IP
 app.use(cors());
 // Permite que la API reciba y entienda datos en formato JSON
 app.use(express.json({ limit: '5mb' }));
 
-// 3. RUTA DE VERIFICACI√ìN (Health Check)
+// 3. RUTA DE VERIFICACI”N (Health Check)
 app.get('/', (req, res) => {
   res.json({ 
-    mensaje: '‚úÖ API Panader√≠a Matias (Control Interno) funcionando correctamente!',
+    mensaje: '? API PanaderÌa Matias (Control Interno) funcionando correctamente!',
     fecha_servidor: new Date()
   });
 });
 
-// 4. DEFINICI√ìN DE ENDPOINTS P√öBLICOS Y PRIVADOS
-// Cada m√≥dulo tiene su propio prefijo de URL para mantener el orden
+// 4. DEFINICI”N DE ENDPOINTS P⁄BLICOS Y PRIVADOS
+// Cada mÛdulo tiene su propio prefijo de URL para mantener el orden
 app.use('/api/auth', authRoutes);           // Manejo de Login y Tokens
-app.use('/api/productos', productRoutes);   // Consulta y edici√≥n del cat√°logo de art√≠culos
+app.use('/api/productos', productRoutes);   // Consulta y ediciÛn del cat·logo de artÌculos
 app.use('/api/ventas', saleRoutes);         // Procesamiento de ventas y transacciones
-app.use('/api/turnos', shiftRoutes);        // Apertura, cierre y auditor√≠a de caja
-app.use('/api/facturas', invoiceRoutes);    // Ingreso de mercader√≠a y actualizaci√≥n de stock
-app.use('/api/mermas', wastageRoutes);      // Registro de p√©rdidas por da√±o o vencimiento
-app.use('/api/reportes', reportRoutes);     // Reportes de gesti√≥n (Venta de cigarros, etc.)
+app.use('/api/turnos', shiftRoutes);        // Apertura, cierre y auditorÌa de caja
+app.use('/api/caja', cashRoutes);           // Alias compatible con cajero desktop
+app.use('/api/facturas', invoiceRoutes);    // Ingreso de mercaderÌa y actualizaciÛn de stock
+app.use('/api/mermas', wastageRoutes);      // Registro de pÈrdidas por daÒo o vencimiento
+app.use('/api/reportes', reportRoutes);     // Reportes de gestiÛn (Venta de cigarros, etc.)
 app.use('/api/inventario', inventoryRoutes); // Consultas de stock local y ajustes manuales
-app.use('/api/usuarios', userRoutes);       // Creaci√≥n y listado de personal
-app.use('/api/maestros', masterRoutes);     // Tablas maestras (Categor√≠as, Sucursales, etc.)
+app.use('/api/usuarios', userRoutes);       // CreaciÛn y listado de personal
+app.use('/api/maestros', masterRoutes);     // Tablas maestras (CategorÌas, Sucursales, etc.)
+app.use('/api', masterRoutes);              // Alias para app mÛvil: /sucursales, /categorias, /proveedores
 app.use('/api/kardex', kardexRoutes);       // Historial completo de movimientos de inventario
 
 app.use('/api/retiros', withdrawalRoutes);  // Retiros de efectivo durante el turno
@@ -60,13 +63,14 @@ app.use((req, res) => {
   res.status(404).json({ error: 'La ruta solicitada no existe en el servidor.' });
 });
 
-// 6. CONFIGURACI√ìN DEL PUERTO Y ARRANQUE
+// 6. CONFIGURACI”N DEL PUERTO Y ARRANQUE
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log('==============================================');
-  console.log(`üöÄ Panader√≠a Matias API operativa`);
-  console.log(`üìç Puerto: ${PORT}`);
-  console.log(`‚è∞ Inicio: ${new Date().toLocaleString()}`);
+  console.log(`?? PanaderÌa Matias API operativa`);
+  console.log(`?? Puerto: ${PORT}`);
+  console.log(`? Inicio: ${new Date().toLocaleString()}`);
   console.log('==============================================');
 });
+

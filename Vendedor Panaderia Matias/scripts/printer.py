@@ -52,11 +52,11 @@ def resolve_cols(paper_mm):
     Conservador para evitar desbordamiento en impresoras pequeñas.
     """
     if paper_mm <= 52:
-        return 24, 16    # 50mm  — muy conservador
+        return 22, 14    # 50mm
     elif paper_mm <= 62:
-        return 30, 20    # 58mm  — el más común
+        return 32, 22    # 58mm
     else:
-        return 46, 30    # 80mm
+        return 48, 32    # 80mm
 
 def print_ticket(data):
     try:
@@ -87,7 +87,14 @@ def print_ticket(data):
 
         sys.stderr.write(f"[PRINTER] Papel: {source} → COLS={COLS}\n")
 
-        p.set(align="center", font="b")
+        p.set(align="center", font="a")
+
+        # ── Margen Izquierdo ──────────────────────────────────────────────────
+        # GS L nL nH (1D 4C nL nH) -> nL + nH*256 dots
+        # 80mm: ~24-32 dots (~3-4mm)
+        # 58mm: ~8-16 dots (~1-2mm)
+        margin_dots = 24 if paper_mm > 62 else 12
+        p._raw(b'\x1d\x4c' + bytes([margin_dots % 256, margin_dots // 256]))
 
         # ── Logo ─────────────────────────────────────────────────────────
         try:
@@ -134,10 +141,10 @@ def print_ticket(data):
         # ── Encabezado ─────────────────────────────────────────────────────────
         if COLS >= 46:
             # 80mm: encabezado normal para evitar texto exagerado.
-            p.set(align="center", font="b", bold=True, double_height=False, double_width=False)
+            p.set(align="center", font="a", bold=True, double_height=False, double_width=False)
             p.text("PANADERIA\n")
             p.text("MATIAS\n")
-            p.set(align="center", font="b", bold=False, double_height=False, double_width=False)
+            p.set(align="center", font="a", bold=False, double_height=False, double_width=False)
             p.text("Panaderia y Pasteleria\n")
         else:
             # 50/58mm: texto normal para que la boleta quede compacta.
@@ -149,9 +156,9 @@ def print_ticket(data):
         p.text(SEP + "\n")
 
         if data.get("tipo") == "arqueo":
-            p.set(align="center", font="b", bold=True, double_height=False, double_width=False)
+            p.set(align="center", font="a", bold=True, double_height=False, double_width=False)
             p.text("RESUMEN DE ARQUEO\n")
-            p.set(align="center", font="b", bold=False, double_height=False, double_width=False)
+            p.set(align="center", font="a", bold=False, double_height=False, double_width=False)
             
             p.text(f"Cajero: {str(data.get('cajero', 'N/A')).upper()}\n")
             if data.get("fecha_inicio"):
@@ -160,7 +167,7 @@ def print_ticket(data):
             p.text(f"Termino: {fecha_termino}\n")
             p.text(SEP + "\n")
             
-            p.set(align="left", font="b", bold=False, double_height=False, double_width=False)
+            p.set(align="left", font="a", bold=False, double_height=False, double_width=False)
             p.text("DETALLE DE VENTA\n")
             p.text(rjust_line("Monto Inicial:", format_currency(data.get("monto_apertura", 0)), COLS) + "\n")
             p.text(rjust_line("Efectivo:", format_currency(data.get("ventas_efectivo", 0)), COLS) + "\n")
@@ -169,6 +176,42 @@ def print_ticket(data):
             p.text(rjust_line("Monto Total:", format_currency(data.get("monto_total", 0)), COLS) + "\n")
             p.text(SEP + "\n")
             
+            cigarros = data.get("cigarros") or []
+            cigarros_total = data.get("cigarros_total", 0) or 0
+            if cigarros:
+                p.text("CIGARROS DEL TURNO\n")
+                p.text(rjust_line("Total cigarros:", format_currency(cigarros_total), COLS) + "\n")
+                for item in cigarros:
+                    nombre = str(item.get("producto", ""))[:NAME_MAX].upper()
+                    try:
+                        cantidad = float(item.get("unidades_vendidas", 0))
+                    except:
+                        cantidad = 0
+                    total_item = float(item.get("total_recaudado", 0) or 0)
+                    cant_str = f"{cantidad:.3f}".rstrip("0").rstrip(".") if cantidad % 1 != 0 else str(int(cantidad))
+                    p.text(f"{nombre}\n")
+                    p.text(rjust_line(f"Cant {cant_str}", format_currency(total_item), COLS) + "\n")
+                p.text(SEP + "\n")
+            
+            retiros = data.get("retiros")
+            total_retiros = data.get("total_retiros", 0)
+            
+            # Si no hay retiros en data, intentar buscarlos en la raiz si el JSON cambió
+            if not retiros and "retiros_turno" in data:
+                retiros = data.get("retiros_turno")
+
+            if retiros and len(retiros) > 0:
+                p.text("RETIROS DEL TURNO\n")
+                p.text(rjust_line("Total retiros:", format_currency(total_retiros), COLS) + "\n")
+                for r in retiros:
+                    motivo = str(r.get("motivo") or r.get("descripcion") or "S/M")[:NAME_MAX].upper()
+                    monto_r = float(r.get("monto", 0))
+                    p.text(f"{motivo}\n")
+                    p.text(rjust_line(" ", format_currency(monto_r), COLS) + "\n")
+                p.text(SEP + "\n")
+            else:
+                sys.stderr.write("[DEBUG] No se encontraron retiros en la data\n")
+
             p.text(rjust_line("Efectivo Esperado:", format_currency(data.get("esperado", 0)), COLS) + "\n")
             p.text(rjust_line("Efectivo Declarado:", format_currency(data.get("declarado", 0)), COLS) + "\n")
             
@@ -180,10 +223,10 @@ def print_ticket(data):
 
             cuadrado = abs(diff) < 0.5 if data.get("cuadrado") is None else bool(data.get("cuadrado"))
             estado = "CUADRADO" if cuadrado else "NO CUADRADO"
-            p.set(align="center", font="b", bold=True, double_height=False, double_width=False)
+            p.set(align="center", font="a", bold=True, double_height=False, double_width=False)
             p.text(SEP + "\n")
             p.text(f"ESTADO: {estado}\n")
-            p.set(align="left", font="b", bold=False, double_height=False, double_width=False)
+            p.set(align="left", font="a", bold=False, double_height=False, double_width=False)
             
             if data.get("observaciones"):
                 p.text(SEP + "\n")
@@ -204,10 +247,10 @@ def print_ticket(data):
                     
             return True, f"Ticket de arqueo impreso ({source}, {COLS} cols)"
 
-        p.set(align="center", font="b", bold=True, double_height=False, double_width=False)
+        p.set(align="center", font="a", bold=True, double_height=False, double_width=False)
         p.text("BOLETA DE VENTA\n")
 
-        p.set(align="center", font="b", bold=False, double_height=False, double_width=False)
+        p.set(align="center", font="a", bold=False, double_height=False, double_width=False)
         p.text(f"Folio: {data.get('folio', 'N/A')}\n")
 
         fecha = data.get("fecha")
@@ -220,7 +263,7 @@ def print_ticket(data):
         p.text(SEP + "\n")
 
         # ── Productos ──────────────────────────────────────────────────────────
-        p.set(align="left", font="b", bold=False, double_height=False, double_width=False)
+        p.set(align="left", font="a", bold=False, double_height=False, double_width=False)
         items = data.get("items", [])
         for item in items:
             nombre = truncate(item.get("nombre", ""), NAME_MAX).upper()
@@ -256,10 +299,10 @@ def print_ticket(data):
 
         # ── Total ──────────────────────────────────────────────────────────────
         total = float(data.get("total", 0))
-        p.set(align="right", font="b", bold=True, double_height=False, double_width=False)
+        p.set(align="right", font="a", bold=True, double_height=False, double_width=False)
         p.text(f"TOTAL {format_currency(total)}\n")
 
-        p.set(align="right", font="b", bold=False, double_height=False, double_width=False)
+        p.set(align="right", font="a", bold=False, double_height=False, double_width=False)
 
         # ── Vuelto ─────────────────────────────────────────────────────────────
         vuelto = data.get("vuelto")
@@ -267,7 +310,7 @@ def print_ticket(data):
             p.text(f"Vuelto: {format_currency(vuelto)}\n")
 
         # ── Footer ─────────────────────────────────────────────────────────────
-        p.set(align="center", font="b", bold=False, double_height=False, double_width=False)
+        p.set(align="center", font="a", bold=False, double_height=False, double_width=False)
         p.text(SEP + "\n")
         p.text("Gracias por su preferencia!\n")
         p.text("No valida como doc. tributario\n")

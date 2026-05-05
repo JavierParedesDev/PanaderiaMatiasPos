@@ -1,4 +1,4 @@
-import { crearTrabajador, getConsumosPersonal, registrarPagoConsumo } from '../../services/staffConsumptionService.js';
+import { actualizarTrabajador, crearTrabajador, eliminarTrabajador, getConsumosPersonal, getTrabajadores, registrarPagoConsumo } from '../../services/staffConsumptionService.js';
 import { escapeHtml, formatCurrency, formatDateTime } from '../../utils/formatters.js';
 
 export function renderConsumoSkeleton() {
@@ -14,7 +14,8 @@ export function renderConsumoSkeleton() {
       <div id="consumo-message" class="hidden rounded-xl px-4 py-3 text-sm font-bold"></div>
 
       <div class="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <form id="trabajador-form" class="panel bg-white p-6 space-y-5">
+        <div class="space-y-6">
+          <form id="trabajador-form" class="panel bg-white p-6 space-y-5">
           <div>
             <h2 class="text-lg font-black text-cafe uppercase tracking-tight">Crear Trabajador</h2>
             <p class="text-xs text-cafe/45 mt-1">Estos nombres apareceran en el POS para consumo interno.</p>
@@ -28,7 +29,20 @@ export function renderConsumoSkeleton() {
             <input id="trabajador-apellido" class="field" required placeholder="Ej: Perez">
           </label>
           <button class="btn-primary w-full py-4" type="submit">Guardar Trabajador</button>
-        </form>
+          </form>
+
+          <section class="panel bg-white p-6">
+            <div class="flex items-center justify-between mb-5">
+              <div>
+                <h2 class="text-lg font-black text-cafe uppercase tracking-tight">Trabajadores Registrados</h2>
+                <p class="text-xs text-cafe/45 mt-1">Listado de trabajadores activos.</p>
+              </div>
+            </div>
+            <div id="trabajadores-list" class="space-y-2">
+              <div class="h-16 rounded-xl bg-papel animate-pulse"></div>
+            </div>
+          </section>
+        </div>
 
         <section class="panel bg-white p-6">
           <div class="flex items-center justify-between mb-5">
@@ -100,6 +114,51 @@ export function renderConsumoSkeleton() {
           </div>
         </div>
       </div>
+
+      <div id="worker-edit-modal" class="hidden fixed inset-0 z-[110] flex items-center justify-center p-4 bg-cafe/80 backdrop-blur-md">
+        <div class="panel w-full max-w-lg bg-white p-0 overflow-hidden shadow-2xl">
+          <div class="p-5 bg-cafe text-white flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-black uppercase tracking-tight">Editar trabajador</h2>
+              <p class="text-xs text-white/60 font-bold uppercase tracking-widest mt-1">Actualiza nombre y apellido</p>
+            </div>
+            <button id="worker-edit-close" class="text-2xl text-white/60 hover:text-white">&times;</button>
+          </div>
+          <form id="worker-edit-form" class="p-6 space-y-4">
+            <label class="block space-y-2">
+              <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Nombre</span>
+              <input id="worker-edit-nombre" class="field" required>
+            </label>
+            <label class="block space-y-2">
+              <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Apellido</span>
+              <input id="worker-edit-apellido" class="field" required>
+            </label>
+            <div class="flex items-center justify-end gap-3">
+              <button id="worker-edit-cancel" type="button" class="rounded-xl border border-borde/40 px-4 py-2 text-xs font-black uppercase tracking-widest text-cafe/70">Cancelar</button>
+              <button type="submit" class="rounded-xl bg-cafe text-white px-5 py-2 text-xs font-black uppercase tracking-widest">Guardar cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="worker-delete-modal" class="hidden fixed inset-0 z-[120] flex items-center justify-center p-4 bg-cafe/80 backdrop-blur-md">
+        <div class="panel w-full max-w-md bg-white p-0 overflow-hidden shadow-2xl">
+          <div class="p-5 bg-cafe text-white flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-black uppercase tracking-tight">Eliminar trabajador</h2>
+              <p class="text-xs text-white/60 font-bold uppercase tracking-widest mt-1">Acción irreversible</p>
+            </div>
+            <button id="worker-delete-close" class="text-2xl text-white/60 hover:text-white">&times;</button>
+          </div>
+          <div class="p-6 space-y-4">
+            <p id="worker-delete-text" class="text-sm text-cafe/70 font-semibold">¿Seguro que deseas eliminar este trabajador?</p>
+            <div class="flex items-center justify-end gap-3">
+              <button id="worker-delete-cancel" type="button" class="rounded-xl border border-borde/40 px-4 py-2 text-xs font-black uppercase tracking-widest text-cafe/70">Cancelar</button>
+              <button id="worker-delete-confirm" type="button" class="rounded-xl bg-rojoaviso text-white px-5 py-2 text-xs font-black uppercase tracking-widest">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   `;
 }
@@ -162,9 +221,32 @@ function renderConsumos(items = [], options = {}) {
   }).join('');
 }
 
+function renderTrabajadores(items = []) {
+  if (!items.length) {
+    return '<div class="rounded-xl border border-dashed border-borde p-4 text-center text-sm text-cafe/40">No hay trabajadores registrados.</div>';
+  }
+
+  return items.map((item) => `
+    <div class="flex items-center justify-between p-3 rounded-xl bg-papel/50 border border-borde/30">
+      <div>
+        <p class="text-sm font-black text-cafe uppercase">${escapeHtml(item.nombre)} ${escapeHtml(item.apellido || '')}</p>
+        <p class="text-[10px] text-cafe/40 font-bold uppercase tracking-widest">ID: ${item.id}</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-bold uppercase ${String(item.activo) === 'false' || item.activo === 0 ? 'text-rojoaviso' : 'text-verdeok'}">
+          ${String(item.activo) === 'false' || item.activo === 0 ? 'Inactivo' : 'Activo'}
+        </span>
+        <button type="button" class="rounded-lg border border-borde/40 px-2 py-1 text-[10px] font-black uppercase text-cafe/70" data-worker-edit="${item.id}" data-worker-nombre="${escapeHtml(item.nombre)}" data-worker-apellido="${escapeHtml(item.apellido || '')}">Editar</button>
+        <button type="button" class="rounded-lg border border-rojoaviso/40 px-2 py-1 text-[10px] font-black uppercase text-rojoaviso" data-worker-delete="${item.id}">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
 export async function hydrateConsumoView() {
   const resumen = document.querySelector('#trabajadores-resumen');
   const list = document.querySelector('#consumos-list');
+  const workersList = document.querySelector('#trabajadores-list');
   const form = document.querySelector('#trabajador-form');
   const cuentaModal = document.querySelector('#cuenta-modal');
   const cuentaClose = document.querySelector('#cuenta-close');
@@ -177,14 +259,32 @@ export async function hydrateConsumoView() {
   const cuentaPagoMonto = document.querySelector('#cuenta-pago-monto');
   const cuentaPagoObservacion = document.querySelector('#cuenta-pago-observacion');
   const cuentaPagarTodo = document.querySelector('#cuenta-pagar-todo');
+  const workerEditModal = document.querySelector('#worker-edit-modal');
+  const workerEditClose = document.querySelector('#worker-edit-close');
+  const workerEditCancel = document.querySelector('#worker-edit-cancel');
+  const workerEditForm = document.querySelector('#worker-edit-form');
+  const workerEditNombre = document.querySelector('#worker-edit-nombre');
+  const workerEditApellido = document.querySelector('#worker-edit-apellido');
+  const workerDeleteModal = document.querySelector('#worker-delete-modal');
+  const workerDeleteClose = document.querySelector('#worker-delete-close');
+  const workerDeleteCancel = document.querySelector('#worker-delete-cancel');
+  const workerDeleteConfirm = document.querySelector('#worker-delete-confirm');
+  const workerDeleteText = document.querySelector('#worker-delete-text');
   let selectedWorkerId = null;
   let selectedWorkerSaldo = 0;
+  let selectedEditWorkerId = null;
+  let selectedDeleteWorkerId = null;
 
   async function load() {
     try {
-      const response = await getConsumosPersonal({ estado: 'Pendiente' });
+      const [response, workersResponse] = await Promise.all([
+        getConsumosPersonal({ estado: 'Pendiente' }),
+        getTrabajadores()
+      ]);
       resumen.innerHTML = renderResumen(response.resumen || []);
       list.innerHTML = renderConsumos(response.data || []);
+      if (workersList) workersList.innerHTML = renderTrabajadores(workersResponse.data || []);
+      bindWorkerActions();
       resumen.querySelectorAll('.worker-card').forEach((card) => {
         card.addEventListener('click', () => openCuenta(card.dataset.workerId, card.dataset.workerName, Number(card.dataset.workerSaldo || 0)));
       });
@@ -192,7 +292,30 @@ export async function hydrateConsumoView() {
       showMessage(error.message, 'error');
       resumen.innerHTML = '';
       list.innerHTML = '';
+      if (workersList) workersList.innerHTML = '';
     }
+  }
+
+  function bindWorkerActions() {
+    if (!workersList) return;
+    workersList.querySelectorAll('[data-worker-edit]').forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedEditWorkerId = button.dataset.workerEdit;
+        workerEditNombre.value = button.dataset.workerNombre || '';
+        workerEditApellido.value = button.dataset.workerApellido || '';
+        workerEditModal.classList.remove('hidden');
+      });
+    });
+
+    workersList.querySelectorAll('[data-worker-delete]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        selectedDeleteWorkerId = button.dataset.workerDelete;
+        if (!selectedDeleteWorkerId) return;
+        const nombre = button.closest('div')?.querySelector('p')?.textContent || 'este trabajador';
+        workerDeleteText.textContent = `¿Seguro que deseas eliminar a ${nombre}?`;
+        workerDeleteModal.classList.remove('hidden');
+      });
+    });
   }
 
   function renderCuentaConsumos(items = []) {
@@ -244,6 +367,21 @@ export async function hydrateConsumoView() {
     cuentaModal.classList.add('hidden');
   });
 
+  function closeEditModal() {
+    workerEditModal.classList.add('hidden');
+    selectedEditWorkerId = null;
+  }
+
+  function closeDeleteModal() {
+    workerDeleteModal.classList.add('hidden');
+    selectedDeleteWorkerId = null;
+  }
+
+  workerEditClose?.addEventListener('click', closeEditModal);
+  workerEditCancel?.addEventListener('click', closeEditModal);
+  workerDeleteClose?.addEventListener('click', closeDeleteModal);
+  workerDeleteCancel?.addEventListener('click', closeDeleteModal);
+
   cuentaPagarTodo?.addEventListener('click', () => {
     cuentaPagoMonto.value = Math.max(0, Math.round(selectedWorkerSaldo || 0));
     cuentaPagoObservacion.value = 'Pago total';
@@ -266,6 +404,38 @@ export async function hydrateConsumoView() {
     }
   });
 
+  workerEditForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!selectedEditWorkerId) return;
+
+    try {
+      await actualizarTrabajador(selectedEditWorkerId, {
+        nombre: workerEditNombre.value,
+        apellido: workerEditApellido.value
+      });
+      showMessage('Trabajador actualizado correctamente.');
+      closeEditModal();
+      await load();
+    } catch (error) {
+      showMessage(error.message, 'error');
+    }
+  });
+
+  workerDeleteConfirm?.addEventListener('click', async () => {
+    if (!selectedDeleteWorkerId) return;
+
+    try {
+      await eliminarTrabajador(selectedDeleteWorkerId);
+      showMessage('Trabajador eliminado correctamente.');
+      closeDeleteModal();
+      await load();
+    } catch (error) {
+      showMessage(error.message, 'error');
+    }
+  });
+
+  await load();
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const nombre = document.querySelector('#trabajador-nombre').value;
@@ -280,6 +450,4 @@ export async function hydrateConsumoView() {
       showMessage(error.message, 'error');
     }
   });
-
-  await load();
 }

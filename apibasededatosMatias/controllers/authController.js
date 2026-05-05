@@ -6,7 +6,7 @@ const login = async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
-        return res.status(400).json({ success: false, error: 'Debes enviar usuario y contraseña.' });
+        return res.status(400).json({ success: false, error: 'Debes enviar usuario y contraseï¿½a.' });
     }
 
     try {
@@ -27,15 +27,17 @@ const login = async (req, res) => {
         const passwordOk = await bcrypt.compare(password, user.password_hash);
 
         if (!passwordOk) {
-            return res.status(401).json({ success: false, error: 'Contraseña incorrecta.' });
+            return res.status(401).json({ success: false, error: 'Contraseï¿½a incorrecta.' });
         }
+
+        const resolvedSucursalId = user.rol === 'Admin' ? user.id_sucursal : (user.id_sucursal || 1);
 
         const token = jwt.sign(
             {
                 id: user.id,
                 username: user.username,
                 rol: user.rol,
-                id_sucursal: user.id_sucursal
+                id_sucursal: resolvedSucursalId
             },
             process.env.JWT_SECRET || 'tu_clave_secreta_provisoria',
             { expiresIn: '24h' }
@@ -49,7 +51,7 @@ const login = async (req, res) => {
                 id: user.id,
                 username: user.username,
                 rol: user.rol,
-                id_sucursal: user.id_sucursal
+                id_sucursal: resolvedSucursalId
             }
         });
 

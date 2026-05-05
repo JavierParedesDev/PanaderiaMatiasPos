@@ -13,14 +13,65 @@ let searchResults = [];
 let currentShift = null;
 let paymentMethods = [];
 let isProcessingSale = false;
+const CART_STORAGE_KEY = "panaderia-matias-pos-cart";
+
+function loadCartFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+    const stored = raw ? JSON.parse(raw) : [];
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCartToStorage(items) {
+  if (!items?.length) {
+    window.localStorage.removeItem(CART_STORAGE_KEY);
+    return;
+  }
+
+  const payload = items.map((item) => ({
+    id: item.id,
+    quantity: item.quantity,
+    precio_venta: item.precio_venta,
+    nombre: item.nombre,
+    codigo_interno: item.codigo_interno,
+    categoria: item.categoria
+  }));
+  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function syncCartWithProducts() {
+  if (!cart.length || !allProducts.length) return;
+
+  cart = cart.map((item) => {
+    const product = allProducts.find((p) => p.id == item.id);
+    return product ? { ...product, quantity: item.quantity } : item;
+  });
+}
 
 function getStock(product) {
   return Number(product?.stock_actual ?? 0);
 }
 
+function calculateItemSubtotal(item) {
+  const quantity = item.quantity || 0;
+  const precioVenta = item.precio_venta || 0;
+  const cantidadPromo = Number(item.cantidad_promo) || 0;
+  const precioPromo = Number(item.precio_promo) || 0;
+
+  if (cantidadPromo > 0 && precioPromo > 0 && quantity >= cantidadPromo) {
+    const numPromos = Math.floor(quantity / cantidadPromo);
+    const rest = quantity % cantidadPromo;
+    return (numPromos * precioPromo) + (rest * precioVenta);
+  }
+  return quantity * precioVenta;
+}
+
 function getCartTotal() {
   return cart.reduce(
-    (acc, item) => acc + (item.precio_venta || 0) * item.quantity,
+    (acc, item) => acc + calculateItemSubtotal(item),
     0,
   );
 }
@@ -31,10 +82,9 @@ export function renderPosSkeleton() {
       
       <!-- COLUMNA CENTRAL: TICKET (Items más pequeños) -->
       <main class="flex-1 flex flex-col p-10 gap-8 min-w-0">
-        <header class="flex items-center justify-between px-6">
-           <h2 class="text-3xl font-black text-cafe uppercase tracking-tighter italic">Venta actual <span id="cart-count" class="text-caramelo ml-2">(0)</span></h2>
-           <button id="clear-cart" class="p-3.5 rounded-xl bg-white border border-borde/40 shadow-sm hover:bg-rojoaviso/5 text-rojoaviso/40 hover:text-rojoaviso transition-all font-black text-[10px] uppercase tracking-widest">Vaciar Ticket</button>
-        </header>
+      <header class="flex items-center justify-between px-6">
+        <h2 class="text-3xl font-black text-cafe uppercase tracking-tighter italic">Venta actual <span id="cart-count" class="text-caramelo ml-2">(0)</span></h2>
+      </header>
 
         <div id="cart-container" class="flex-1 bg-white border border-borde/40 shadow-xl overflow-hidden flex flex-col">
           <div class="flex items-center px-8 py-5 border-b border-borde/10 text-[10px] font-black uppercase tracking-[0.2em] text-cafe/30 shrink-0">
@@ -60,14 +110,6 @@ export function renderPosSkeleton() {
           
           <!-- Resumen de Totales -->
           <div class="space-y-4">
-            <div class="flex items-center justify-between text-sm font-bold text-cafe/40 uppercase tracking-widest">
-              <span>Subtotal</span>
-              <span id="cart-subtotal" class="text-cafe font-black">$ 0</span>
-            </div>
-            <div class="flex items-center justify-between text-sm font-bold text-cafe/40 uppercase tracking-widest">
-              <span>Descuento</span>
-              <span id="cart-discount" class="text-verdeok font-black">-$ 0</span>
-            </div>
             <div class="pt-6 border-t border-borde/40 flex flex-col items-end">
                <span class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.3em] mb-1">Total a Cobrar</span>
                <span id="cart-total" class="text-5xl font-black text-cafe tracking-tighter leading-none">$ 0</span>
@@ -103,19 +145,6 @@ export function renderPosSkeleton() {
           </div>
         </div>
 
-        <!-- Selector Ancho de Papel + Toggle Impresión -->
-        <div class="px-4 pb-2 flex items-center justify-between">
-          <span class="text-[9px] font-black text-cafe/30 uppercase tracking-[0.2em]">🖨 Papel</span>
-          <div class="flex gap-2">
-            <button id="paper-50-btn" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-borde/30 transition-all">50mm</button>
-            <button id="paper-80-btn" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-borde/30 transition-all">80mm</button>
-          </div>
-        </div>
-        <div class="px-4 pb-3 flex items-center justify-between">
-          <span class="text-[9px] font-black text-cafe/30 uppercase tracking-[0.2em]">🧳 Ticket</span>
-          <button id="print-toggle-btn" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-borde/30 transition-all">ON</button>
-        </div>
-
         <!-- Botón Cobrar (VERDE / CUADRADO TOTAL AL FONDO) -->
                 <div class="px-4 pb-3">
           <button id="internal-consumption-button" class="w-full h-16 bg-cafe/10 hover:bg-cafe text-cafe hover:text-white border border-cafe/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed" disabled>
@@ -123,10 +152,14 @@ export function renderPosSkeleton() {
           </button>
         </div>
 
-        <button id="pay-button" class="btn-pos-pay-success h-28 flex flex-col items-center justify-center gap-1 active:brightness-90 transition-all font-black italic uppercase" disabled>
-           <span class="text-[10px] opacity-60 tracking-[0.3em]">Finalizar Venta</span>
-           <span class="text-2xl tracking-tighter" id="pay-button-text">COBRAR $ 0</span>
-        </button>
+      <div class="px-4 pb-3">
+       <button id="quick-print-toggle" class="w-full py-3 rounded-xl border border-borde/30 text-[10px] font-black uppercase tracking-[0.3em] text-cafe/60 hover:bg-papel transition-all">Ticket: ON</button>
+      </div>
+
+      <button id="pay-button" class="btn-pos-pay-success h-28 flex flex-col items-center justify-center gap-1 active:brightness-90 transition-all font-black italic uppercase" disabled>
+        <span class="text-[10px] opacity-60 tracking-[0.3em]">Finalizar Venta</span>
+        <span class="text-2xl tracking-tighter" id="pay-button-text">COBRAR $ 0</span>
+      </button>
       </aside>
     </div>
 
@@ -232,7 +265,7 @@ export function renderPosSkeleton() {
               <select id="tipo-turno-pos" class="w-full h-14 bg-papel border-2 border-borde/40 rounded-2xl px-6 text-sm font-black uppercase tracking-widest outline-none focus:border-caramelo transition-all text-cafe">
                 <option value="Mañana">Mañana</option>
                 <option value="Tarde">Tarde</option>
-                <option value="Único" selected>Único</option>
+                <option value="Unico" selected>Unico</option>
               </select>
            </div>
            <button type="submit" class="w-full py-6 rounded-2xl bg-caramelo text-white font-black uppercase tracking-[0.3em] shadow-2xl shadow-caramelo/40 hover:scale-[1.02] active:scale-95 transition-all text-lg">Abrir Turno Ahora 🥖</button>
@@ -252,15 +285,28 @@ export function renderPosSkeleton() {
         </div>
       </div>
     </div>
+
+    <!-- Modal de Confirmación -->
+    <div id="confirm-modal" class="hidden fixed inset-0 flex items-center justify-center p-4 bg-cafe/70 backdrop-blur-sm" style="z-index: 9999;">
+      <div class="panel w-full max-w-sm bg-white p-10 space-y-6 text-center animate-zoomIn shadow-2xl">
+        <p class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.3em]">Confirmación</p>
+        <h3 id="confirm-title" class="text-xl font-black text-cafe uppercase tracking-tighter">Confirmar</h3>
+        <p id="confirm-message" class="text-sm text-cafe/60 font-medium">¿Estás seguro?</p>
+        <div class="flex gap-4 pt-4">
+          <button id="confirm-cancel" class="flex-1 py-3 rounded-xl font-black uppercase text-xs tracking-widest text-cafe/50 hover:bg-papel transition-all">Cancelar</button>
+          <button id="confirm-ok" class="flex-1 py-3 rounded-xl bg-caramelo text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-caramelo/30 hover:scale-105 active:scale-95 transition-all">Aceptar</button>
+        </div>
+      </div>
+    </div>
   `;
 }
 
 export async function hydratePosView() {
+  cart = loadCartFromStorage();
   const searchInput = document.querySelector("#header-search");
   const headerResults = document.querySelector("#header-search-results");
   const cartItemsContainer = document.querySelector("#cart-items");
   const cartTotal = document.querySelector("#cart-total");
-  const cartSubtotal = document.querySelector("#cart-subtotal");
   const cartCount = document.querySelector("#cart-count");
   const payButton = document.querySelector("#pay-button");
   const payButtonText = document.querySelector("#pay-button-text");
@@ -288,25 +334,31 @@ export async function hydratePosView() {
   const confirmMsg = document.querySelector("#confirm-message");
   const confirmOkBtn = document.querySelector("#confirm-ok");
   const confirmCancelBtn = document.querySelector("#confirm-cancel");
+  const quickPrintToggle = document.querySelector('#quick-print-toggle');
 
   function showConfirm(title, message, onConfirm) {
-    confirmTitle.textContent = title;
-    confirmMsg.textContent = message;
-    confirmModal.classList.remove("hidden");
+    const modal = document.querySelector("#confirm-modal");
+    const titleEl = document.querySelector("#confirm-title");
+    const msgEl = document.querySelector("#confirm-message");
+    const okBtn = document.querySelector("#confirm-ok");
+    const cancelBtn = document.querySelector("#confirm-cancel");
 
-    // Clonar para limpiar handlers viejos
-    const newOk = confirmOkBtn.cloneNode(true);
-    confirmOkBtn.parentNode.replaceChild(newOk, confirmOkBtn);
-    const newCancel = confirmCancelBtn.cloneNode(true);
-    confirmCancelBtn.parentNode.replaceChild(newCancel, confirmCancelBtn);
+    if (!modal || !titleEl || !msgEl || !okBtn || !cancelBtn || !okBtn.parentNode || !cancelBtn.parentNode) {
+      if (window.confirm(message)) onConfirm();
+      return;
+    }
 
-    newOk.addEventListener("click", () => {
-      confirmModal.classList.add("hidden");
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    modal.classList.remove("hidden");
+
+    okBtn.onclick = () => {
+      modal.classList.add("hidden");
       onConfirm();
-    });
-    newCancel.addEventListener("click", () => {
-      confirmModal.classList.add("hidden");
-    });
+    };
+    cancelBtn.onclick = () => {
+      modal.classList.add("hidden");
+    };
   }
 
   async function loadData() {
@@ -334,6 +386,8 @@ export async function hydratePosView() {
       allProducts = (pRes.data || [])
         .filter((p) => p.activo)
         .map((p) => ({ ...p, stock_actual: getStock(p) }));
+      syncCartWithProducts();
+      updateCartUI();
     } catch (e) {
       console.error("Error al cargar productos:", e);
     }
@@ -370,8 +424,14 @@ export async function hydratePosView() {
   // Escuchar búsqueda desde el evento global de app.js
   if (window._posSearchListener)
     window.removeEventListener("pos-search", window._posSearchListener);
+  let scanLock = false;
+  let scanLockTimer = null;
   window._posSearchListener = (e) => {
     const term = (e.detail || "").trim().toLowerCase();
+
+    if (scanLock) {
+      return;
+    }
 
     if (term.length < 2) {
       headerResults.classList.add("hidden");
@@ -387,6 +447,63 @@ export async function hydratePosView() {
       )
       .slice(0, 15);
 
+    const digiData = parseDigiScaleBarcode(term);
+    if (digiData) {
+      scanLock = true;
+      if (scanLockTimer) clearTimeout(scanLockTimer);
+      scanLockTimer = setTimeout(() => {
+        scanLock = false;
+      }, 250);
+      const normalizedPlu = String(digiData.plu).replace(/^0+/, "") || "0";
+      const paddedPlu = String(digiData.plu).padStart(digiData.pluLength || 4, "0");
+      let scaleMatch = allProducts.find(
+        (p) => {
+          const pluBalanza = String(p.plu_balanza || "").replace(/^0+/, "");
+          const codigoInterno = String(p.codigo_interno || "").replace(/^0+/, "");
+          const codigoExterno = String(p.codigo_barra_externo || "").replace(/^0+/, "");
+
+          return (
+            String(p.plu_balanza || "").padStart(digiData.pluLength || 4, "0") === paddedPlu ||
+            pluBalanza === normalizedPlu ||
+            codigoInterno === normalizedPlu ||
+            codigoExterno === normalizedPlu
+          );
+        },
+      );
+
+      if (!scaleMatch && digiData.pluLength === 5) {
+        const fallbackPlu = normalizedPlu.slice(1);
+        scaleMatch = allProducts.find(
+          (p) => {
+            const pluBalanza = String(p.plu_balanza || "").replace(/^0+/, "");
+            const codigoInterno = String(p.codigo_interno || "").replace(/^0+/, "");
+            const codigoExterno = String(p.codigo_barra_externo || "").replace(/^0+/, "");
+
+            return (
+              pluBalanza === fallbackPlu ||
+              codigoInterno === fallbackPlu ||
+              codigoExterno === fallbackPlu
+            );
+          },
+        );
+      }
+
+      if (scaleMatch) {
+        addToCart(scaleMatch.id, true, digiData.weight);
+        headerResults.classList.add("hidden");
+        if (searchInput) {
+          searchInput.value = "";
+          searchInput.focus();
+        }
+        return;
+      }
+
+      showNotification(
+        `PLU ${paddedPlu} no encontrado en productos. Peso ${digiData.weight.toFixed(3)} kg`,
+        "warning",
+      );
+    }
+
     // AUTO-ADD si hay coincidencia EXACTA por código (Ideal para Scanners)
     const exactMatch = allProducts.find(
       (p) =>
@@ -395,6 +512,11 @@ export async function hydratePosView() {
     );
 
     if (exactMatch) {
+      scanLock = true;
+      if (scanLockTimer) clearTimeout(scanLockTimer);
+      scanLockTimer = setTimeout(() => {
+        scanLock = false;
+      }, 250);
       addToCart(exactMatch.id);
       headerResults.classList.add("hidden");
       if (searchInput) {
@@ -461,6 +583,43 @@ export async function hydratePosView() {
   function isPesable(product) {
     const flag = product?.pesable;
     return flag === true || flag === 1 || flag === "1" || flag === "true";
+  }
+
+  function validateEAN13(barcode) {
+    if (barcode.length !== 13) return false;
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      sum += parseInt(barcode[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+    const checksum = (10 - (sum % 10)) % 10;
+    return checksum === parseInt(barcode[12]);
+  }
+
+  function parseDigiScaleBarcode(rawValue = "") {
+    const digits = String(rawValue || "").replace(/\D/g, "");
+    if (digits.length !== 13) return null;
+
+    if (!validateEAN13(digits)) {
+      console.warn("Check-digit de balanza inv\u00e1lido:", digits);
+      return null;
+    }
+
+    const prefix = digits.slice(0, 2);
+    if (!["59", "95", "25"].includes(prefix)) return null;
+
+    // Prefijo 25: PLU de 5 dígitos (según requerimiento de Panadería Matías)
+    // Otros prefijos: PLU de 4 dígitos (estándar común)
+    const pluLength = prefix === "25" ? 5 : 4;
+    const plu = digits.slice(2, 2 + pluLength);
+
+    // El peso son los dígitos después del PLU hasta el penúltimo dígito (el último es el checksum)
+    // Ejemplo 25: 25(2) + 03043(5) + 00582(5) + 0(1) = 13
+    const weightRaw = digits.slice(2 + pluLength, 12);
+    const weight = Number(weightRaw) / 1000;
+
+    if (!plu || !Number.isFinite(weight) || weight <= 0) return null;
+
+    return { plu, weight, pluLength };
   }
 
   function showWeightModal(product, onConfirm) {
@@ -595,8 +754,8 @@ export async function hydratePosView() {
 
             <!-- Col 4: Subtotal (w-48) -->
             <div class="w-48 text-right pr-6 shrink-0">
-               <p class="text-5xl font-black text-cafe tracking-tighter tabular-nums leading-none">${formatCurrency(item.precio_venta * item.quantity)}</p>
-               <p class="text-[10px] font-black text-caramelo uppercase tracking-[0.2em] mt-2.5">Subtotal</p>
+               <p class="text-5xl font-black text-cafe tracking-tighter tabular-nums leading-none">${formatCurrency(calculateItemSubtotal(item))}</p>
+               ${item.cantidad_promo > 0 && item.quantity >= item.cantidad_promo ? `<p class="text-[9px] font-bold text-verdeok uppercase tracking-widest mt-1">PROMO APLICADA</p>` : `<p class="text-[10px] font-black text-caramelo uppercase tracking-[0.2em] mt-2.5">Subtotal</p>`}
             </div>
 
             <!-- Col 5: Eliminar (w-12) -->
@@ -639,9 +798,9 @@ export async function hydratePosView() {
 
     const total = getCartTotal();
     cartTotal.textContent = formatCurrency(total);
-    cartSubtotal.textContent = formatCurrency(total);
-    cartCount.textContent = `(${cart.reduce((acc, i) => acc + i.quantity, 0)})`;
+  cartCount.textContent = `(${cart.length})`;
     payButtonText.textContent = `COBRAR ${formatCurrency(total)}`;
+    saveCartToStorage(cart);
   }
 
   methodBtns.forEach((btn) => {
@@ -850,9 +1009,11 @@ export async function hydratePosView() {
 
     try {
       const printerName = localStorage.getItem('selected_printer') || '';
+      const paperWidth = localStorage.getItem('paper_width') || '80';
       const result = await window.electronAPI.printTicket({ 
         ...printData, 
-        printer_name: printerName 
+        printer_name: printerName,
+        paper_width: paperWidth
       });
       if (!result?.success) {
         const printError = result?.error || result?.message || result?.failureReason || "REVISA LA IMPRESORA";
@@ -922,8 +1083,11 @@ export async function hydratePosView() {
       payloadPagos = [{ id_metodo_pago: methodId, monto_pagado: total }];
     }
 
+    const session = getSession();
+    const sucursalId = session?.usuario?.id_sucursal || 1;
     const payload = {
       id_turno: currentShift.id,
+      id_sucursal: sucursalId,
       total_venta: total,
       detalle_productos: cart.map((item) => ({
         id_producto: item.id,
@@ -948,7 +1112,7 @@ export async function hydratePosView() {
       const paperWidth = parseInt(localStorage.getItem('paper_width') || '80', 10);
       const skipPrint = localStorage.getItem('print_ticket') === 'false';
 
-      await printSaleTicket({
+      const printPayload = {
         folio: folio,
         total: total,
         metodo: method,
@@ -958,8 +1122,8 @@ export async function hydratePosView() {
           nombre: i.nombre,
           cantidad: i.quantity,
           precio_unitario: i.precio_venta || 0,
-        })),
-      });
+        }))
+      };
 
       cart.forEach((item) => {
         const product = allProducts.find((p) => p.id === item.id);
@@ -972,6 +1136,8 @@ export async function hydratePosView() {
       updateCartUI();
       isProcessingSale = false;
       confirmMixedBtn.disabled = false;
+
+      printSaleTicket(printPayload).catch(() => {});
     } catch (error) {
       console.error("Error Venta:", error);
       showNotification(
@@ -985,11 +1151,11 @@ export async function hydratePosView() {
     }
   }
 
-  clearCartBtn.addEventListener("click", () => {
+  clearCartBtn?.addEventListener("click", () => {
     if (cart.length > 0) {
       showConfirm(
-        "VACIAR VENTA",
-        "Se eliminarán todos los items cargados del ticket actual",
+        "VACIAR CARRITO",
+        "Se eliminarán todos los items cargados del carrito actual",
         () => {
           cart = [];
           updateCartUI();
@@ -1028,8 +1194,8 @@ export async function hydratePosView() {
     if (e.key === "Escape") {
       if (cart.length > 0) {
         showConfirm(
-          "VACIAR TICKET",
-          "¿Estás seguro de que deseas eliminar todos los productos?",
+          "VACIAR CARRITO",
+          "¿Estás seguro de que deseas eliminar todos los productos del carrito?",
           () => {
             cart = [];
             updateCartUI();
@@ -1046,41 +1212,20 @@ export async function hydratePosView() {
     }
   });
 
-  // Toggle imprimir ticket
-  const printToggleBtn = document.getElementById('print-toggle-btn');
+  // Botón rápido de impresión
   let printTicketEnabled = localStorage.getItem('print_ticket') !== 'false';
-
-  function updatePrintToggle() {
-    if (!printToggleBtn) return;
-    printToggleBtn.textContent = printTicketEnabled ? 'ON' : 'OFF';
-    printToggleBtn.style.background = printTicketEnabled ? '#c47a2a' : '';
-    printToggleBtn.style.color = printTicketEnabled ? '#fff' : '';
-  }
-  if (printToggleBtn) {
-    printToggleBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      printTicketEnabled = !printTicketEnabled;
-      localStorage.setItem('print_ticket', String(printTicketEnabled));
-      updatePrintToggle();
-    });
-  }
-  updatePrintToggle();
-
-  // Inicializar botones de ancho de papel
-  const savedPaper = localStorage.getItem('paper_width') || '80';
-  const btn50 = document.getElementById('paper-50-btn');
-  const btn80 = document.getElementById('paper-80-btn');
-
-  function setPaperWidth(mm) {
-    localStorage.setItem('paper_width', String(mm));
-    if (btn50) { btn50.style.background = mm === 50 ? '#c47a2a' : ''; btn50.style.color = mm === 50 ? '#fff' : ''; }
-    if (btn80) { btn80.style.background = mm === 80 ? '#c47a2a' : ''; btn80.style.color = mm === 80 ? '#fff' : ''; }
-  }
-
-  if (btn50) btn50.addEventListener('click', (e) => { e.stopPropagation(); setPaperWidth(50); });
-  if (btn80) btn80.addEventListener('click', (e) => { e.stopPropagation(); setPaperWidth(80); });
-
-  setPaperWidth(parseInt(savedPaper, 10));
+  const updateQuickPrintToggle = () => {
+    if (!quickPrintToggle) return;
+    quickPrintToggle.textContent = `Ticket: ${printTicketEnabled ? 'ON' : 'OFF'}`;
+    quickPrintToggle.style.background = printTicketEnabled ? '#c47a2a' : '';
+    quickPrintToggle.style.color = printTicketEnabled ? '#fff' : '';
+  };
+  quickPrintToggle?.addEventListener('click', () => {
+    printTicketEnabled = !printTicketEnabled;
+    localStorage.setItem('print_ticket', String(printTicketEnabled));
+    updateQuickPrintToggle();
+  });
+  updateQuickPrintToggle();
 
   await loadData();
 }

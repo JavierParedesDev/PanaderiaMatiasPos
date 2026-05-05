@@ -50,7 +50,7 @@ const ajustarStock = async (req, res) => {
     const id_sucursal = resolveSucursalId(req);
 
     if (!Number.isInteger(id_producto) || id_producto <= 0) {
-        return res.status(400).json({ success: false, error: 'Debe indicar un producto vÃ¡lido.' });
+        return res.status(400).json({ success: false, error: 'Debe indicar un producto válido.' });
     }
 
     if (cantidad_ajustada === null || cantidad_ajustada === 0) {
@@ -116,7 +116,7 @@ const ajustarStock = async (req, res) => {
     }
 };
 
-// 3. Fijar stock absoluto para inicializaciÃ³n o correcciÃ³n
+// 3. Fijar stock absoluto para inicialización o corrección
 const fijarStockProducto = async (req, res) => {
     const id_producto = Number(req.params.id_producto);
     const stockObjetivo = parseNumber(req.body.stock_actual);
@@ -126,15 +126,15 @@ const fijarStockProducto = async (req, res) => {
     const id_sucursal = resolveSucursalId(req);
 
     if (!Number.isInteger(id_producto) || id_producto <= 0) {
-        return res.status(400).json({ success: false, error: 'Debe indicar un producto vÃ¡lido.' });
+        return res.status(400).json({ success: false, error: 'Debe indicar un producto válido.' });
     }
 
     if (stockObjetivo === null || stockObjetivo < 0) {
-        return res.status(400).json({ success: false, error: 'El stock_actual debe ser un nÃºmero mayor o igual a cero.' });
+        return res.status(400).json({ success: false, error: 'El stock_actual debe ser un número mayor o igual a cero.' });
     }
 
     if (req.body.stock_minimo !== undefined && (stockMinimo === null || stockMinimo < 0)) {
-        return res.status(400).json({ success: false, error: 'El stock_minimo debe ser un nÃºmero mayor o igual a cero.' });
+        return res.status(400).json({ success: false, error: 'El stock_minimo debe ser un número mayor o igual a cero.' });
     }
 
     const client = await pool.connect();

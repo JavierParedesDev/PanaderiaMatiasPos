@@ -1,4 +1,17 @@
-import { crearCategoria, crearProveedor, getCategorias, getProveedores, getSucursales, getMetodosPago } from '../../services/masterService.js';
+import {
+  actualizarCategoria,
+  actualizarMetodoPago,
+  actualizarProveedor,
+  crearCategoria,
+  crearProveedor,
+  eliminarCategoria,
+  eliminarMetodoPago,
+  eliminarProveedor,
+  getCategorias,
+  getProveedores,
+  getSucursales,
+  getMetodosPago
+} from '../../services/masterService.js';
 import { escapeHtml } from '../../utils/formatters.js';
 
 function renderMessage(id) {
@@ -63,7 +76,11 @@ export async function hydrateMaestrosView() {
           ${catRes.data.map(c => `
             <div class="flex items-center justify-between p-2 rounded-lg hover:bg-papel/20">
               <span class="text-sm font-bold text-cafe">${escapeHtml(c.nombre)}</span>
-              <span class="text-[10px] text-cafe/30">ID: ${c.id}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-cafe/30">ID: ${c.id}</span>
+                <button type="button" class="rounded-lg border border-borde/40 px-2 py-1 text-[10px] font-black uppercase text-cafe/70" data-edit-type="categoria" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Editar</button>
+                <button type="button" class="rounded-lg border border-rojoaviso/40 px-2 py-1 text-[10px] font-black uppercase text-rojoaviso" data-delete-type="categoria" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Eliminar</button>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -88,7 +105,11 @@ export async function hydrateMaestrosView() {
           ${provRes.data.map(p => `
             <div class="flex items-center justify-between p-2 rounded-lg hover:bg-papel/20">
               <span class="text-sm font-bold text-cafe">${escapeHtml(p.nombre_empresa || '')}</span>
-              <span class="text-[10px] text-cafe/30">RUT: ${escapeHtml(p.rut_proveedor || 'N/A')}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-cafe/30">RUT: ${escapeHtml(p.rut_proveedor || 'N/A')}</span>
+                <button type="button" class="rounded-lg border border-borde/40 px-2 py-1 text-[10px] font-black uppercase text-cafe/70" data-edit-type="proveedor" data-id="${p.id}" data-nombre="${escapeHtml(p.nombre_empresa || '')}" data-rut="${escapeHtml(p.rut_proveedor || '')}" data-contacto="${escapeHtml(p.contacto_nombre || '')}" data-telefono="${escapeHtml(p.telefono || '')}">Editar</button>
+                <button type="button" class="rounded-lg border border-rojoaviso/40 px-2 py-1 text-[10px] font-black uppercase text-rojoaviso" data-delete-type="proveedor" data-id="${p.id}" data-nombre="${escapeHtml(p.nombre_empresa || '')}">Eliminar</button>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -114,18 +135,61 @@ export async function hydrateMaestrosView() {
         <div class="flex items-center justify-between mb-4 border-b border-borde/20 pb-3">
           <h2 class="text-lg font-black text-[#2d221b]">Métodos de Pago</h2>
         </div>
+        ${renderMessage('metodo-message')}
         <div class="space-y-2">
           ${pagRes.data.map(m => `
             <div class="flex items-center justify-between p-2 rounded-lg hover:bg-papel/20">
               <span class="text-sm font-bold text-cafe">${escapeHtml(m.nombre)}</span>
-              <div class="w-2 h-2 rounded-full bg-verdeok"></div>
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-verdeok"></div>
+                <button type="button" class="rounded-lg border border-borde/40 px-2 py-1 text-[10px] font-black uppercase text-cafe/70" data-edit-type="metodo" data-id="${m.id}" data-nombre="${escapeHtml(m.nombre)}">Editar</button>
+                <button type="button" class="rounded-lg border border-rojoaviso/40 px-2 py-1 text-[10px] font-black uppercase text-rojoaviso" data-delete-type="metodo" data-id="${m.id}" data-nombre="${escapeHtml(m.nombre)}">Eliminar</button>
+              </div>
             </div>
           `).join('')}
         </div>
       </section>
+
+      <div id="maestro-edit-modal" class="hidden fixed inset-0 z-[110] flex items-center justify-center p-4 bg-cafe/80 backdrop-blur-md">
+        <div class="panel w-full max-w-lg bg-white p-0 overflow-hidden shadow-2xl">
+          <div class="p-5 bg-cafe text-white flex items-center justify-between">
+            <div>
+              <h2 id="maestro-edit-title" class="text-lg font-black uppercase tracking-tight">Editar</h2>
+              <p class="text-xs text-white/60 font-bold uppercase tracking-widest mt-1">Actualiza la información</p>
+            </div>
+            <button id="maestro-edit-close" class="text-2xl text-white/60 hover:text-white">&times;</button>
+          </div>
+          <form id="maestro-edit-form" class="p-6 space-y-4">
+            <div id="maestro-edit-fields" class="space-y-3"></div>
+            <div class="flex items-center justify-end gap-3">
+              <button id="maestro-edit-cancel" type="button" class="rounded-xl border border-borde/40 px-4 py-2 text-xs font-black uppercase tracking-widest text-cafe/70">Cancelar</button>
+              <button type="submit" class="rounded-xl bg-cafe text-white px-5 py-2 text-xs font-black uppercase tracking-widest">Guardar cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="maestro-delete-modal" class="hidden fixed inset-0 z-[120] flex items-center justify-center p-4 bg-cafe/80 backdrop-blur-md">
+        <div class="panel w-full max-w-md bg-white p-0 overflow-hidden shadow-2xl">
+          <div class="p-5 bg-cafe text-white flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-black uppercase tracking-tight">Eliminar</h2>
+              <p class="text-xs text-white/60 font-bold uppercase tracking-widest mt-1">Acción irreversible</p>
+            </div>
+            <button id="maestro-delete-close" class="text-2xl text-white/60 hover:text-white">&times;</button>
+          </div>
+          <div class="p-6 space-y-4">
+            <p id="maestro-delete-text" class="text-sm text-cafe/70 font-semibold">¿Seguro que deseas eliminar?</p>
+            <div class="flex items-center justify-end gap-3">
+              <button id="maestro-delete-cancel" type="button" class="rounded-xl border border-borde/40 px-4 py-2 text-xs font-black uppercase tracking-widest text-cafe/70">Cancelar</button>
+              <button id="maestro-delete-confirm" type="button" class="rounded-xl bg-rojoaviso text-white px-5 py-2 text-xs font-black uppercase tracking-widest">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
 
-        document.querySelector('#form-categoria')?.addEventListener('submit', async (event) => {
+  document.querySelector('#form-categoria')?.addEventListener('submit', async (event) => {
             event.preventDefault();
             const form = event.currentTarget;
             const button = form.querySelector('button[type="submit"]');
@@ -150,7 +214,7 @@ export async function hydrateMaestrosView() {
             }
         });
 
-        document.querySelector('#form-proveedor')?.addEventListener('submit', async (event) => {
+  document.querySelector('#form-proveedor')?.addEventListener('submit', async (event) => {
             event.preventDefault();
             const form = event.currentTarget;
             const button = form.querySelector('button[type="submit"]');
@@ -179,7 +243,167 @@ export async function hydrateMaestrosView() {
                 button.disabled = false;
                 button.textContent = 'Agregar proveedor';
             }
-        });
+    });
+
+    const editModal = document.querySelector('#maestro-edit-modal');
+    const editClose = document.querySelector('#maestro-edit-close');
+    const editCancel = document.querySelector('#maestro-edit-cancel');
+    const editTitle = document.querySelector('#maestro-edit-title');
+    const editFields = document.querySelector('#maestro-edit-fields');
+    const editForm = document.querySelector('#maestro-edit-form');
+    const deleteModal = document.querySelector('#maestro-delete-modal');
+    const deleteClose = document.querySelector('#maestro-delete-close');
+    const deleteCancel = document.querySelector('#maestro-delete-cancel');
+    const deleteConfirm = document.querySelector('#maestro-delete-confirm');
+    const deleteText = document.querySelector('#maestro-delete-text');
+    let currentEdit = null;
+    let currentDelete = null;
+
+    const closeEditModal = () => {
+      editModal.classList.add('hidden');
+      currentEdit = null;
+    };
+
+    const closeDeleteModal = () => {
+      deleteModal.classList.add('hidden');
+      currentDelete = null;
+    };
+
+    editClose?.addEventListener('click', closeEditModal);
+    editCancel?.addEventListener('click', closeEditModal);
+    deleteClose?.addEventListener('click', closeDeleteModal);
+    deleteCancel?.addEventListener('click', closeDeleteModal);
+
+    document.querySelectorAll('[data-edit-type]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const type = button.dataset.editType;
+        const id = button.dataset.id;
+        const nombre = button.dataset.nombre || '';
+        currentEdit = { type, id };
+
+        if (type === 'categoria') {
+          editTitle.textContent = 'Editar categoria';
+          editFields.innerHTML = `
+            <label class="block space-y-2">
+            <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Nombre</span>
+                        <input id="edit-nombre" class="field" value="${escapeHtml(nombre)}" required>
+            </label>
+          `;
+        }
+
+        if (type === 'metodo') {
+          editTitle.textContent = 'Editar metodo de pago';
+          editFields.innerHTML = `
+            <label class="block space-y-2">
+            <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Nombre</span>
+                        <input id="edit-nombre" class="field" value="${escapeHtml(nombre)}" required>
+            </label>
+          `;
+        }
+
+        if (type === 'proveedor') {
+          editTitle.textContent = 'Editar proveedor';
+          editFields.innerHTML = `
+            <div class="grid gap-3 sm:grid-cols-2">
+            <label class="block space-y-2 sm:col-span-2">
+              <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Nombre proveedor</span>
+                          <input id="edit-nombre" class="field" value="${escapeHtml(nombre)}" required>
+            </label>
+            <label class="block space-y-2">
+              <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">RUT</span>
+                          <input id="edit-rut" class="field" value="${escapeHtml(button.dataset.rut || '')}">
+            </label>
+            <label class="block space-y-2">
+              <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Contacto</span>
+                          <input id="edit-contacto" class="field" value="${escapeHtml(button.dataset.contacto || '')}">
+            </label>
+            <label class="block space-y-2 sm:col-span-2">
+              <span class="text-[10px] font-black text-cafe/40 uppercase tracking-widest">Telefono</span>
+                          <input id="edit-telefono" class="field" value="${escapeHtml(button.dataset.telefono || '')}">
+            </label>
+            </div>
+          `;
+        }
+
+        editModal.classList.remove('hidden');
+      });
+    });
+
+    document.querySelectorAll('[data-delete-type]').forEach((button) => {
+      button.addEventListener('click', () => {
+        currentDelete = { type: button.dataset.deleteType, id: button.dataset.id };
+        const nombre = button.dataset.nombre || 'este registro';
+        deleteText.textContent = `¿Seguro que deseas eliminar ${nombre}?`;
+        deleteModal.classList.remove('hidden');
+      });
+    });
+
+    editForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!currentEdit) return;
+
+      try {
+        if (currentEdit.type === 'categoria') {
+          await actualizarCategoria(currentEdit.id, { nombre: document.querySelector('#edit-nombre')?.value });
+          showMessage('categoria-message', 'success', 'Categoria actualizada.');
+        }
+
+        if (currentEdit.type === 'metodo') {
+          await actualizarMetodoPago(currentEdit.id, { nombre: document.querySelector('#edit-nombre')?.value });
+          showMessage('metodo-message', 'success', 'Metodo actualizado.');
+        }
+
+        if (currentEdit.type === 'proveedor') {
+          await actualizarProveedor(currentEdit.id, {
+            nombre_empresa: document.querySelector('#edit-nombre')?.value,
+            rut_proveedor: document.querySelector('#edit-rut')?.value || null,
+            contacto_nombre: document.querySelector('#edit-contacto')?.value || null,
+            telefono: document.querySelector('#edit-telefono')?.value || null
+          });
+          showMessage('proveedor-message', 'success', 'Proveedor actualizado.');
+        }
+
+        closeEditModal();
+        await hydrateMaestrosView();
+      } catch (error) {
+        const messageId = currentEdit.type === 'proveedor'
+          ? 'proveedor-message'
+          : currentEdit.type === 'metodo'
+            ? 'metodo-message'
+            : 'categoria-message';
+        showMessage(messageId, 'error', error.message);
+      }
+    });
+
+    deleteConfirm?.addEventListener('click', async () => {
+      if (!currentDelete) return;
+      try {
+        if (currentDelete.type === 'categoria') {
+          await eliminarCategoria(currentDelete.id);
+          showMessage('categoria-message', 'success', 'Categoria eliminada.');
+        }
+
+        if (currentDelete.type === 'proveedor') {
+          await eliminarProveedor(currentDelete.id);
+          showMessage('proveedor-message', 'success', 'Proveedor eliminado.');
+        }
+
+        if (currentDelete.type === 'metodo') {
+          await eliminarMetodoPago(currentDelete.id);
+          showMessage('metodo-message', 'success', 'Metodo eliminado.');
+        }
+
+        closeDeleteModal();
+        await hydrateMaestrosView();
+      } catch (error) {
+        const messageId = currentDelete.type === 'proveedor'
+          ? 'proveedor-message'
+          : currentDelete.type === 'metodo'
+            ? 'metodo-message'
+            : 'categoria-message';
+        showMessage(messageId, 'error', error.message);
+      }
+    });
     } catch (error) {
         container.innerHTML = `<div class="col-span-2 panel p-8 text-center text-rojoaviso font-bold bg-white">${error.message}</div>`;
     }

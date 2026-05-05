@@ -1,4 +1,4 @@
-﻿const path = require('path');
+const path = require('path');
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -20,8 +20,13 @@ autoUpdater.autoInstallOnAppQuit = true;
 ipcMain.handle('check-for-updates', async () => {
   try {
     const result = await autoUpdater.checkForUpdatesAndNotify();
-    return { success: true, data: result };
+    // Solo devolvemos la info esencial para evitar errores de clonación de objetos complejos
+    return { 
+      success: true, 
+      updateInfo: result ? result.updateInfo : null 
+    };
   } catch (error) {
+    console.error("Error checking for updates:", error);
     return { success: false, error: error.message };
   }
 });
@@ -81,6 +86,26 @@ function resolvePrinterExecutable() {
   return path.join(__dirname, 'scripts', 'printer.exe');
 }
 
+function resolvePrinterScript() {
+  const scriptPath = resolveAppAsset('scripts', 'printer.py');
+  if (fs.existsSync(scriptPath)) return scriptPath;
+  return null;
+}
+
+function resolvePrinterCommand() {
+  if (!app.isPackaged) {
+    const scriptPath = resolvePrinterScript();
+    if (scriptPath) {
+      if (process.platform === 'win32') {
+        return { command: 'py', args: ['-3', scriptPath] };
+      }
+      return { command: 'python3', args: [scriptPath] };
+    }
+  }
+
+  return { command: resolvePrinterExecutable(), args: [] };
+}
+
 function tryParsePrinterResult(rawText) {
   const text = String(rawText || '').trim();
   if (!text) return null;
@@ -127,8 +152,9 @@ app.whenReady().then(() => {
 
   ipcMain.handle('print-ticket', async (event, ticketData = {}) => {
     return new Promise((resolve) => {
-      // Ruta al script de Python
-      let scriptPath = resolvePrinterExecutable();
+      const { command, args } = resolvePrinterCommand();
+      let scriptPath = command;
+      const usesInterpreter = ['py', 'python', 'python3'].includes(command);
 
       // Si la app estÃ¡ empaquetada, el binario se encuentra en app.asar.unpacked
       if (scriptPath.includes('app.asar')) {
@@ -136,13 +162,19 @@ app.whenReady().then(() => {
       }
 
       try {
-        if (!fs.existsSync(scriptPath)) {
-          resolve({ success: false, error: `No se encontro printer.exe en: ${scriptPath}` });
+        if (usesInterpreter) {
+          const targetScript = args?.[args.length - 1];
+          if (!targetScript || !fs.existsSync(targetScript)) {
+            resolve({ success: false, error: `No se encontro printer.py en: ${targetScript || '(sin ruta)'}` });
+            return;
+          }
+        } else if (!fs.existsSync(scriptPath)) {
+          resolve({ success: false, error: `No se encontro el ejecutable/cliente de impresiÃ³n en: ${scriptPath}` });
           return;
         }
 
-        // Ejecutar el proceso binario compilado
-        const pythonProcess = spawn(scriptPath, []);
+        // Ejecutar el proceso binario compilado o script python
+        const pythonProcess = spawn(scriptPath, args, { shell: false });
 
         let outputData = '';
         let errorData = '';

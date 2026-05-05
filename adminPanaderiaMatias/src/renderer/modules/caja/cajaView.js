@@ -81,11 +81,11 @@ export async function hydrateCajaView() {
         <section class="panel p-6 bg-white shadow-sm border-t-4 border-t-cafe">
           <div class="flex items-center justify-between mb-8 border-b border-borde/30 pb-4">
             <h2 class="text-xl font-black text-[#2d221b]">Auditoria de Cierres</h2>
-            <p class="text-[10px] font-bold text-cafe/40 uppercase">Ultimos 10 cierres</p>
+            <p class="text-[10px] font-bold text-cafe/40 uppercase">Ultimos 15 cierres</p>
           </div>
 
           <div class="space-y-3">
-            ${historial.length ? historial.slice(0, 10).map(t => {
+            ${historial.length ? historial.slice(0, 15).map(t => {
       const diff = Number(t.diferencia_efectivo) || 0;
       const hasDiff = Math.abs(diff) > 0;
       return `

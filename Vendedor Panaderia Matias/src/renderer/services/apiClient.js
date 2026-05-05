@@ -32,6 +32,7 @@ async function request(path, options = {}) {
     if (session?.token) {
       clearSession();
     }
+    window.dispatchEvent(new CustomEvent('session-expired'));
   }
 
   if (!response.ok) {

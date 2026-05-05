@@ -11,6 +11,14 @@ window.addEventListener('drop', (e) => e.preventDefault());
 
 const app = document.querySelector('#app');
 let currentRoute = 'dashboard';
+let scannerBuffer = '';
+let scannerTimer = null;
+let suppressHeaderSearch = false;
+
+window.addEventListener('session-expired', () => {
+  currentRoute = 'dashboard';
+  renderApp();
+});
 
 const routes = {
   dashboard: { render: renderPosSkeleton, hydrate: hydratePosView },
@@ -22,6 +30,7 @@ const routes = {
 function buildShell() {
   const session = getSession();
   const config = routes[currentRoute];
+  const showHeaderSearch = currentRoute === 'dashboard';
 
   return `
     <div class="flex flex-col h-screen bg-crema/20 overflow-hidden font-sans">
@@ -38,6 +47,7 @@ function buildShell() {
 
         <!-- Buscador Central -->
         <div class="flex-1 max-w-2xl px-8">
+           ${showHeaderSearch ? `
            <div class="relative group">
              <span class="absolute left-5 top-1/2 -translate-y-1/2 text-xl text-cafe/30 group-focus-within:text-cafe transition-colors">🔍</span>
              <input id="header-search" type="text" 
@@ -45,6 +55,7 @@ function buildShell() {
                     placeholder="Buscar producto por nombre o código...">
              <div id="header-search-results" class="search-results-dropdown hidden"></div>
            </div>
+           ` : ''}
         </div>
 
         <!-- Acciones Rápidas -->
@@ -93,12 +104,61 @@ function buildShell() {
 }
 
 async function renderProtectedApp() {
+  if (!isAuthenticated()) {
+    renderApp();
+    return;
+  }
   app.innerHTML = buildShell();
 
   // Escuchar búsqueda global
-  document.querySelector('#header-search')?.addEventListener('input', (e) => {
+  const headerSearch = document.querySelector('#header-search');
+  headerSearch?.addEventListener('input', (e) => {
+    if (suppressHeaderSearch) {
+      suppressHeaderSearch = false;
+      return;
+    }
     window.dispatchEvent(new CustomEvent('pos-search', { detail: e.target.value }));
   });
+
+  // Captura de escáner (buffer de teclado)
+  if (window._scannerListener) {
+    document.removeEventListener('keydown', window._scannerListener);
+  }
+  window._scannerListener = (e) => {
+    if (currentRoute !== 'dashboard') return;
+    const target = e.target;
+    const isEditable = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+    if (isEditable && target.id !== 'header-search') return;
+
+    if (scannerTimer) clearTimeout(scannerTimer);
+
+    if (e.key === 'Enter') {
+      if (scannerBuffer.length > 1) {
+        if (headerSearch) {
+          suppressHeaderSearch = true;
+          headerSearch.value = scannerBuffer;
+        }
+        window.dispatchEvent(new CustomEvent('pos-search', { detail: scannerBuffer }));
+      }
+      scannerBuffer = '';
+      return;
+    }
+
+    if (e.key && e.key.length === 1) {
+      scannerBuffer += e.key;
+      scannerTimer = setTimeout(() => {
+        if (scannerBuffer.length > 1) {
+          if (headerSearch) {
+            suppressHeaderSearch = true;
+            headerSearch.value = scannerBuffer;
+          }
+          window.dispatchEvent(new CustomEvent('pos-search', { detail: scannerBuffer }));
+        }
+        scannerBuffer = '';
+      }, 120);
+    }
+  };
+  document.addEventListener('keydown', window._scannerListener);
 
   document.querySelectorAll('[data-route]').forEach((btn) => {
     btn.addEventListener('click', async () => {

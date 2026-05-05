@@ -48,6 +48,70 @@ const crearTrabajador = async (req, res) => {
     }
 };
 
+const actualizarTrabajador = async (req, res) => {
+    const id_trabajador = Number(req.params.id_trabajador);
+    const nombre = String(req.body.nombre || '').trim();
+    const apellido = String(req.body.apellido || '').trim();
+
+    if (!Number.isInteger(id_trabajador) || id_trabajador <= 0) {
+        return res.status(400).json({ success: false, error: 'Trabajador invalido.' });
+    }
+
+    if (!nombre || !apellido) {
+        return res.status(400).json({ success: false, error: 'Debe indicar nombre y apellido.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `UPDATE trabajadores
+             SET nombre = $1, apellido = $2
+             WHERE id = $3
+             RETURNING id, nombre, apellido, activo, fecha_creacion`,
+            [nombre, apellido, id_trabajador]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Trabajador no encontrado.' });
+        }
+
+        res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        if (error.code === '23505') {
+            return res.status(400).json({ success: false, error: 'Ese trabajador ya existe.' });
+        }
+
+        console.error('Error al actualizar trabajador:', error);
+        res.status(500).json({ success: false, error: 'Error al actualizar trabajador.' });
+    }
+};
+
+const eliminarTrabajador = async (req, res) => {
+    const id_trabajador = Number(req.params.id_trabajador);
+
+    if (!Number.isInteger(id_trabajador) || id_trabajador <= 0) {
+        return res.status(400).json({ success: false, error: 'Trabajador invalido.' });
+    }
+
+    try {
+        const result = await pool.query(
+            `UPDATE trabajadores
+             SET activo = false
+             WHERE id = $1
+             RETURNING id, nombre, apellido, activo`,
+            [id_trabajador]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Trabajador no encontrado.' });
+        }
+
+        res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        console.error('Error al eliminar trabajador:', error);
+        res.status(500).json({ success: false, error: 'Error al eliminar trabajador.' });
+    }
+};
+
 const registrarConsumo = async (req, res) => {
     const id_trabajador = Number(req.body.id_trabajador);
     const id_turno = req.body.id_turno ? Number(req.body.id_turno) : null;
@@ -336,6 +400,8 @@ const registrarPago = async (req, res) => {
 module.exports = {
     getTrabajadores,
     crearTrabajador,
+    actualizarTrabajador,
+    eliminarTrabajador,
     registrarConsumo,
     getConsumos,
     registrarPago

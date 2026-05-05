@@ -4,8 +4,9 @@ export async function getDashboard() {
   return apiClient.get('/reportes/dashboard');
 }
 
-export async function getReporteCigarros() {
-  return apiClient.get('/reportes/cigarros');
+export async function getReporteCigarros(filtros = {}) {
+  const query = new URLSearchParams(filtros).toString();
+  return apiClient.get(query ? `/reportes/cigarros?${query}` : '/reportes/cigarros');
 }
 
 export async function getRankingProductos() {

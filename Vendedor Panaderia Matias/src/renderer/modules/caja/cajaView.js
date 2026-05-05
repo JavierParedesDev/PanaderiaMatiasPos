@@ -116,7 +116,7 @@ export function renderCajaSkeleton() {
                 <select id="tipo-turno-caja" class="field">
                   <option value="Mañana">Mañana</option>
                   <option value="Tarde">Tarde</option>
-                  <option value="Único" selected>Único</option>
+                  <option value="Unico" selected>Unico</option>
                 </select>
               </label>
            </div>
@@ -159,10 +159,14 @@ export async function hydrateCajaView() {
     if (!window.electronAPI?.printTicket || !resumen) return;
 
     const printerName = localStorage.getItem('selected_printer') || '';
+    const paperWidth = localStorage.getItem('paper_width') || '80';
+    
     const result = await window.electronAPI.printTicket({
       tipo: 'arqueo',
       printer_name: printerName,
+      paper_width: paperWidth,
       cajero: resumen.cajero,
+      tipo_turno: resumen.tipo_turno,
       fecha_inicio: formatTicketDate(resumen.fecha_inicio),
       fecha_termino: formatTicketDate(resumen.fecha_termino),
       monto_apertura: resumen.monto_apertura,
@@ -174,6 +178,10 @@ export async function hydrateCajaView() {
       declarado: resumen.declarado,
       diferencia: resumen.diferencia,
       cuadrado: resumen.cuadrado,
+      cigarros_total: resumen.cigarros_total,
+      cigarros: resumen.cigarros,
+      total_retiros: resumen.total_retiros,
+      retiros: resumen.retiros,
       observaciones
     });
 
@@ -246,7 +254,7 @@ export async function hydrateCajaView() {
         <div class="flex items-start justify-between gap-4 p-4 rounded-xl bg-papel/50 border border-borde/30">
           <div class="min-w-0">
             <p class="text-xs font-black text-cafe uppercase truncate">${escapeHtml(retiro.motivo)}</p>
-            <p class="text-[10px] text-cafe/50 font-bold truncate">${escapeHtml(retiro.descripcion || 'Sin descripciÃ³n')}</p>
+            <p class="text-[10px] text-cafe/50 font-bold truncate">${escapeHtml(retiro.descripcion || 'Sin descripción')}</p>
           </div>
           <div class="text-right shrink-0">
             <p class="text-sm font-black text-cafe">${formatCurrency(retiro.monto)}</p>
@@ -372,6 +380,17 @@ export async function hydrateCajaView() {
               💾 Guardar
             </button>
           </div>
+          <div class="flex items-center justify-between gap-4 pt-2 border-t border-borde/10">
+            <span class="text-[10px] font-black text-cafe/40 uppercase tracking-[0.3em]">Papel</span>
+            <div class="flex gap-2">
+              <button id="paper-50-btn" class="text-[10px] font-black uppercase px-4 py-2 rounded-lg border border-borde/30 transition-all">50mm</button>
+              <button id="paper-80-btn" class="text-[10px] font-black uppercase px-4 py-2 rounded-lg border border-borde/30 transition-all">80mm</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-black text-cafe/40 uppercase tracking-[0.3em]">Ticket</span>
+            <button id="print-toggle-btn" class="text-[10px] font-black uppercase px-4 py-2 rounded-lg border border-borde/30 transition-all">ON</button>
+          </div>
         </section>
       `;
 
@@ -402,6 +421,9 @@ export async function hydrateCajaView() {
       const selectImpresoras = document.querySelector('#select-impresoras');
       const btnGuardarImpresora = document.querySelector('#btn-guardar-impresora');
       const impresoraGuardada = localStorage.getItem('selected_printer') || '';
+  const printToggleBtn = document.getElementById('print-toggle-btn');
+  const btn50 = document.getElementById('paper-50-btn');
+  const btn80 = document.getElementById('paper-80-btn');
 
       if (window.electronAPI && window.electronAPI.getPrinters) {
         // Usar IIFE asíncrona para cargar impresoras
@@ -424,6 +446,32 @@ export async function hydrateCajaView() {
         localStorage.setItem('selected_printer', seleccionada);
         showNotification('Impresora guardada correctamente.', 'success');
       });
+
+      // Toggle imprimir ticket
+      let printTicketEnabled = localStorage.getItem('print_ticket') !== 'false';
+      const updatePrintToggle = () => {
+        if (!printToggleBtn) return;
+        printToggleBtn.textContent = printTicketEnabled ? 'ON' : 'OFF';
+        printToggleBtn.style.background = printTicketEnabled ? '#c47a2a' : '';
+        printToggleBtn.style.color = printTicketEnabled ? '#fff' : '';
+      };
+      printToggleBtn?.addEventListener('click', () => {
+        printTicketEnabled = !printTicketEnabled;
+        localStorage.setItem('print_ticket', String(printTicketEnabled));
+        updatePrintToggle();
+      });
+      updatePrintToggle();
+
+      // Selector de papel
+      const savedPaper = localStorage.getItem('paper_width') || '80';
+      const setPaperWidth = (mm) => {
+        localStorage.setItem('paper_width', String(mm));
+        if (btn50) { btn50.style.background = mm === 50 ? '#c47a2a' : ''; btn50.style.color = mm === 50 ? '#fff' : ''; }
+        if (btn80) { btn80.style.background = mm === 80 ? '#c47a2a' : ''; btn80.style.color = mm === 80 ? '#fff' : ''; }
+      };
+      btn50?.addEventListener('click', () => setPaperWidth(50));
+      btn80?.addEventListener('click', () => setPaperWidth(80));
+      setPaperWidth(parseInt(savedPaper, 10));
 
       document.querySelector('#btn-abrir-retiro')?.addEventListener('click', () => {
         retiroMessage?.classList.add('hidden');

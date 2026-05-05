@@ -134,7 +134,25 @@ function createWindow() {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.panaderiamatias.admin');
 
-  ipcMain.handle('scale:send-plu', async (_event, payload) => sendScalePayload(payload));
+const { autoUpdater } = require('electron-updater');
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdatesAndNotify();
+    return { 
+      success: true, 
+      updateInfo: result ? result.updateInfo : null 
+    };
+  } catch (error) {
+    console.error("Error checking for updates:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('scale:send-plu', async (_event, payload) => sendScalePayload(payload));
 
   createWindow();
 

@@ -129,6 +129,11 @@ const routes = {
 
 let currentRoute = 'dashboard';
 
+window.addEventListener('session-expired', () => {
+  currentRoute = 'dashboard';
+  renderApp();
+});
+
 function getRouteConfig(routeKey) {
   const config = routes[routeKey];
   if (!config) return null;
@@ -212,6 +217,10 @@ function buildShell() {
 }
 
 async function renderProtectedApp() {
+  if (!isAuthenticated()) {
+    renderApp();
+    return;
+  }
   app.innerHTML = buildShell();
 
   document.querySelectorAll('[data-route]').forEach((btn) => {
