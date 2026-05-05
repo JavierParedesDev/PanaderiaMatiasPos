@@ -35,46 +35,46 @@ function buildShell() {
   return `
     <div class="flex flex-col h-screen bg-crema/20 overflow-hidden font-sans">
       <!-- HEADER PRINCIPAL (BASADO EN REFERENCIA) -->
-      <header class="h-24 bg-white border-b border-borde/40 px-10 flex items-center justify-between shrink-0">
+      <header class="h-16 md:h-20 bg-white border-b border-borde/40 px-4 md:px-10 flex items-center justify-between shrink-0">
         <!-- Logo y Sección -->
-        <div class="flex items-center gap-6 min-w-[280px] cursor-pointer hover:opacity-80 transition-all group" data-route="dashboard">
+        <div class="flex items-center gap-6 min-w-[200px] cursor-pointer hover:opacity-80 transition-all group" data-route="dashboard">
           <div class="flex items-center gap-4">
-             <img src="./assets/logo.png" alt="Logo Panadería Matías" class="h-16 w-auto drop-shadow-md group-hover:scale-105 transition-transform">
-             <div class="h-10 w-px bg-borde/60 mx-1"></div>
-             <span class="text-2xl font-black text-caramelo uppercase tracking-tighter italic group-hover:text-cafe transition-colors">Venta</span>
+             <img src="./assets/logo.png" alt="Logo Panadería Matías" class="h-10 md:h-14 w-auto drop-shadow-md group-hover:scale-105 transition-transform">
+             <div class="h-8 w-px bg-borde/60 mx-1 hidden md:block"></div>
+             <span class="text-lg md:text-2xl font-black text-caramelo uppercase tracking-tighter italic group-hover:text-cafe transition-colors">Venta</span>
           </div>
         </div>
 
         <!-- Buscador Central -->
-        <div class="flex-1 max-w-2xl px-8">
+        <div class="flex-1 max-w-4xl px-4">
            ${showHeaderSearch ? `
            <div class="relative group">
-             <span class="absolute left-5 top-1/2 -translate-y-1/2 text-xl text-cafe/30 group-focus-within:text-cafe transition-colors">🔍</span>
+             <span class="absolute left-5 top-1/2 -translate-y-1/2 text-lg text-cafe/30 group-focus-within:text-cafe transition-colors">🔍</span>
              <input id="header-search" type="text" 
-                    class="w-full h-14 bg-papel border border-borde/60 rounded-2xl pl-14 pr-6 text-base font-medium outline-none focus:ring-4 focus:ring-cafe/5 focus:border-cafe/30 transition-all shadow-sm"
-                    placeholder="Buscar producto por nombre o código...">
+                    class="w-full h-10 md:h-12 bg-papel border border-borde/60 rounded-2xl pl-14 pr-6 text-sm md:text-base font-medium outline-none focus:ring-4 focus:ring-cafe/5 focus:border-cafe/30 transition-all shadow-sm"
+                    placeholder="Buscar producto...">
              <div id="header-search-results" class="search-results-dropdown hidden"></div>
            </div>
            ` : ''}
         </div>
 
         <!-- Acciones Rápidas -->
-        <div class="flex items-center gap-3 min-w-[280px] justify-end">
-           <button class="header-action-btn group" data-route="ventas" title="Historial">
-             <span class="text-xl">🕒</span>
-             <span class="text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors">Historial</span>
+        <div class="flex items-center gap-2 md:gap-3 min-w-[200px] justify-end">
+           <button class="header-action-btn group !w-10 !h-10 md:!w-16 md:!h-16" data-route="ventas" title="Historial">
+             <span class="text-base md:text-xl">🕒</span>
+             <span class="text-[8px] md:text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors hidden sm:block">Historial</span>
            </button>
-           <button class="header-action-btn group" data-route="caja" title="Configuración / Caja">
-             <span class="text-xl">⚙️</span>
-             <span class="text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors">Turno</span>
+           <button class="header-action-btn group !w-10 !h-10 md:!w-16 md:!h-16" data-route="caja" title="Configuración / Caja">
+             <span class="text-base md:text-xl">⚙️</span>
+             <span class="text-[8px] md:text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors hidden sm:block">Turno</span>
            </button>
-           <button id="btn-fullscreen" class="header-action-btn group" title="Pantalla Completa">
-             <span class="text-xl">⛶</span>
-             <span class="text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors">Pantalla</span>
+           <button id="btn-fullscreen" class="header-action-btn group !w-10 !h-10 md:!w-16 md:!h-16" title="Pantalla Completa">
+             <span class="text-base md:text-xl">⛶</span>
+             <span class="text-[8px] md:text-[9px] font-black uppercase text-cafe/40 group-hover:text-cafe transition-colors hidden sm:block">Pantalla</span>
            </button>
-           <button id="logout-button" class="header-action-btn group text-rojoaviso hover:bg-rojoaviso/5" title="Cerrar Sistema">
-             <span class="text-xl">🚪</span>
-             <span class="text-[9px] font-black uppercase opacity-40">Salir</span>
+           <button id="logout-button" class="header-action-btn group !w-10 !h-10 md:!w-16 md:!h-16 text-rojoaviso hover:bg-rojoaviso/5" title="Cerrar Sistema">
+             <span class="text-base md:text-xl">🚪</span>
+             <span class="text-[8px] md:text-[9px] font-black uppercase opacity-40 hidden sm:block">Salir</span>
            </button>
         </div>
       </header>
@@ -85,7 +85,7 @@ function buildShell() {
       </main>
 
       <!-- FOOTER DE ESTADO -->
-      <footer class="h-10 bg-white border-t border-borde/30 px-10 flex items-center justify-between text-[10px] font-bold text-cafe/40 shrink-0">
+      <footer class="h-8 bg-white border-t border-borde/30 px-10 flex items-center justify-between text-[10px] font-bold text-cafe/40 shrink-0">
         <div class="flex items-center gap-8 uppercase tracking-widest">
            <span>CAJA: <span class="text-cafe">CAJA 01</span></span>
            <span>APERTURA: <span class="text-cafe">${new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} AM</span></span>
@@ -128,34 +128,47 @@ async function renderProtectedApp() {
     if (currentRoute !== 'dashboard') return;
     const target = e.target;
     const isEditable = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+    
+    // Si estamos en cualquier campo de texto que NO sea el buscador, ignoramos completamente
     if (isEditable && target.id !== 'header-search') return;
 
-    if (scannerTimer) clearTimeout(scannerTimer);
-
     if (e.key === 'Enter') {
+      if (scannerTimer) clearTimeout(scannerTimer);
+      
+      // Caso 1: Se detectó un escaneo global (fuera del input)
       if (scannerBuffer.length > 1) {
         if (headerSearch) {
           suppressHeaderSearch = true;
           headerSearch.value = scannerBuffer;
         }
         window.dispatchEvent(new CustomEvent('pos-search', { detail: scannerBuffer }));
+        scannerBuffer = '';
+      } 
+      // Caso 2: El scanner escribió directamente en el buscador o el usuario pulsó Enter
+      else if (target && target.id === 'header-search' && target.value.length > 0) {
+        window.dispatchEvent(new CustomEvent('pos-search', { detail: target.value }));
       }
-      scannerBuffer = '';
       return;
     }
 
-    if (e.key && e.key.length === 1) {
-      scannerBuffer += e.key;
-      scannerTimer = setTimeout(() => {
-        if (scannerBuffer.length > 1) {
-          if (headerSearch) {
-            suppressHeaderSearch = true;
-            headerSearch.value = scannerBuffer;
+    // Solo buffereamos globalmente si NO estamos en un campo de texto
+    // Esto evita que al escribir manual "rápido" el buffer compita y borre el texto
+    if (!isEditable) {
+      if (scannerTimer) clearTimeout(scannerTimer);
+
+      if (e.key && e.key.length === 1) {
+        scannerBuffer += e.key;
+        scannerTimer = setTimeout(() => {
+          if (scannerBuffer.length > 1) {
+            if (headerSearch) {
+              suppressHeaderSearch = true;
+              headerSearch.value = scannerBuffer;
+            }
+            window.dispatchEvent(new CustomEvent('pos-search', { detail: scannerBuffer }));
           }
-          window.dispatchEvent(new CustomEvent('pos-search', { detail: scannerBuffer }));
-        }
-        scannerBuffer = '';
-      }, 120);
+          scannerBuffer = '';
+        }, 150); // Aumentamos levemente el margen para scanners más lentos
+      }
     }
   };
   document.addEventListener('keydown', window._scannerListener);

@@ -34,6 +34,8 @@ const getAllowedTurnosFromDb = async (client) => {
  */
 const getTurnos = async (req, res) => {
     const { estado } = req.query;
+    const limit = Math.min(Number.parseInt(req.query.limit, 10) || 20, 100);
+    const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
     try {
         let query = `
             SELECT 
@@ -48,7 +50,17 @@ const getTurnos = async (req, res) => {
             query += ` AND t.estado = $${params.length}`;
         }
 
-        query += ` ORDER BY t.fecha_apertura DESC LIMIT 50`;
+        const countResult = await pool.query(
+            `SELECT COUNT(*)::int as total FROM turnos_caja t WHERE 1=1${estado ? ' AND t.estado = $1' : ''}`,
+            params
+        );
+
+        params.push(limit);
+        const limitIndex = params.length;
+        params.push(offset);
+        const offsetIndex = params.length;
+
+        query += ` ORDER BY t.fecha_apertura DESC LIMIT $${limitIndex} OFFSET $${offsetIndex}`;
 
         const result = await pool.query(query, params);
         const turnos = result.rows;
@@ -104,7 +116,16 @@ const getTurnos = async (req, res) => {
             };
         });
 
-        res.json({ success: true, data });
+        const total = Number(countResult.rows[0]?.total || 0);
+
+        res.json({
+            success: true,
+            data,
+            total,
+            limit,
+            offset,
+            hasMore: offset + result.rowCount < total
+        });
     } catch (error) {
         console.error('Error al obtener turnos:', error);
         res.status(500).json({ success: false, error: 'Error al obtener la lista de turnos.' });

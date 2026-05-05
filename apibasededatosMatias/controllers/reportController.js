@@ -449,6 +449,159 @@ const getVentasPorTurno = async (req, res) => {
     }
 };
 
+const getMetricasFinancieras = async (req, res) => {
+    const id_sucursal = resolveReportSucursalId(req);
+
+    try {
+        const params = [id_sucursal];
+
+        const resumenResult = await pool.query(
+            `WITH venta_finanzas AS (
+                SELECT
+                    vc.id,
+                    vc.fecha,
+                    vc.total_venta,
+                    COALESCE(SUM(COALESCE(p.precio_costo, 0) * COALESCE(vd.cantidad, 0)), 0) AS costo_total,
+                    COALESCE(SUM((COALESCE(vd.precio_unitario, 0) - COALESCE(p.precio_costo, 0)) * COALESCE(vd.cantidad, 0)), 0) AS ganancia
+                FROM ventas_cabecera vc
+                LEFT JOIN ventas_detalle vd ON vd.id_venta = vc.id
+                LEFT JOIN productos p ON p.id = vd.id_producto
+                WHERE vc.fecha >= date_trunc('month', CURRENT_DATE)
+                  AND ($1::int IS NULL OR vc.id_sucursal = $1)
+                GROUP BY vc.id
+             )
+             SELECT
+                COALESCE(SUM(total_venta), 0) AS venta_total,
+                COALESCE(SUM(costo_total), 0) AS costo_total,
+                COALESCE(SUM(ganancia), 0) AS ganancia_total,
+                COUNT(*)::int AS transacciones,
+                CASE WHEN COALESCE(SUM(total_venta), 0) > 0
+                    THEN ROUND((COALESCE(SUM(ganancia), 0) / COALESCE(SUM(total_venta), 0)) * 100, 2)
+                    ELSE 0
+                END AS margen_porcentaje
+             FROM venta_finanzas`,
+            params
+        );
+
+        const semanalResult = await pool.query(
+            `WITH dias AS (
+                SELECT generate_series(
+                    date_trunc('week', CURRENT_DATE)::date,
+                    (date_trunc('week', CURRENT_DATE)::date + INTERVAL '6 days')::date,
+                    INTERVAL '1 day'
+                )::date AS fecha
+             ),
+             venta_finanzas AS (
+                SELECT
+                    vc.id,
+                    vc.fecha::date AS fecha,
+                    vc.total_venta,
+                    COALESCE(SUM(COALESCE(p.precio_costo, 0) * COALESCE(vd.cantidad, 0)), 0) AS costo_total,
+                    COALESCE(SUM((COALESCE(vd.precio_unitario, 0) - COALESCE(p.precio_costo, 0)) * COALESCE(vd.cantidad, 0)), 0) AS ganancia
+                FROM ventas_cabecera vc
+                LEFT JOIN ventas_detalle vd ON vd.id_venta = vc.id
+                LEFT JOIN productos p ON p.id = vd.id_producto
+                WHERE vc.fecha::date BETWEEN date_trunc('week', CURRENT_DATE)::date
+                  AND (date_trunc('week', CURRENT_DATE)::date + INTERVAL '6 days')::date
+                  AND ($1::int IS NULL OR vc.id_sucursal = $1)
+                GROUP BY vc.id
+             )
+             SELECT
+                d.fecha,
+                COALESCE(SUM(v.total_venta), 0) AS venta_total,
+                COALESCE(SUM(v.costo_total), 0) AS costo_total,
+                COALESCE(SUM(v.ganancia), 0) AS ganancia_total,
+                COUNT(v.id)::int AS transacciones
+             FROM dias d
+             LEFT JOIN venta_finanzas v ON v.fecha = d.fecha
+             GROUP BY d.fecha
+             ORDER BY d.fecha ASC`,
+            params
+        );
+
+        const mensualResult = await pool.query(
+            `WITH meses AS (
+                SELECT generate_series(
+                    date_trunc('year', CURRENT_DATE)::date,
+                    (date_trunc('year', CURRENT_DATE)::date + INTERVAL '11 months')::date,
+                    INTERVAL '1 month'
+                )::date AS mes
+             ),
+             venta_finanzas AS (
+                SELECT
+                    vc.id,
+                    date_trunc('month', vc.fecha)::date AS mes,
+                    vc.total_venta,
+                    COALESCE(SUM(COALESCE(p.precio_costo, 0) * COALESCE(vd.cantidad, 0)), 0) AS costo_total,
+                    COALESCE(SUM((COALESCE(vd.precio_unitario, 0) - COALESCE(p.precio_costo, 0)) * COALESCE(vd.cantidad, 0)), 0) AS ganancia
+                FROM ventas_cabecera vc
+                LEFT JOIN ventas_detalle vd ON vd.id_venta = vc.id
+                LEFT JOIN productos p ON p.id = vd.id_producto
+                WHERE vc.fecha >= date_trunc('year', CURRENT_DATE)
+                  AND vc.fecha < date_trunc('year', CURRENT_DATE) + INTERVAL '1 year'
+                  AND ($1::int IS NULL OR vc.id_sucursal = $1)
+                GROUP BY vc.id
+             )
+             SELECT
+                m.mes,
+                COALESCE(SUM(v.total_venta), 0) AS venta_total,
+                COALESCE(SUM(v.costo_total), 0) AS costo_total,
+                COALESCE(SUM(v.ganancia), 0) AS ganancia_total,
+                COUNT(v.id)::int AS transacciones
+             FROM meses m
+             LEFT JOIN venta_finanzas v ON v.mes = m.mes
+             GROUP BY m.mes
+             ORDER BY m.mes ASC`,
+            params
+        );
+
+        const pagosResult = await pool.query(
+            `SELECT
+                COALESCE(mp.nombre, 'Efectivo') AS metodo,
+                COALESCE(SUM(vp.monto_pagado), 0) AS total
+             FROM ventas_pagos vp
+             JOIN ventas_cabecera vc ON vc.id = vp.id_venta
+             LEFT JOIN metodos_pago mp ON mp.id = vp.id_metodo_pago
+             WHERE vc.fecha >= date_trunc('month', CURRENT_DATE)
+               AND ($1::int IS NULL OR vc.id_sucursal = $1)
+             GROUP BY mp.nombre
+             ORDER BY total DESC`,
+            params
+        );
+
+        const productosResult = await pool.query(
+            `SELECT
+                p.nombre,
+                COALESCE(SUM(vd.cantidad), 0) AS unidades,
+                COALESCE(SUM(vd.subtotal), 0) AS venta_total,
+                COALESCE(SUM((COALESCE(vd.precio_unitario, 0) - COALESCE(p.precio_costo, 0)) * COALESCE(vd.cantidad, 0)), 0) AS ganancia_total
+             FROM ventas_detalle vd
+             JOIN ventas_cabecera vc ON vc.id = vd.id_venta
+             JOIN productos p ON p.id = vd.id_producto
+             WHERE vc.fecha >= date_trunc('month', CURRENT_DATE)
+               AND ($1::int IS NULL OR vc.id_sucursal = $1)
+             GROUP BY p.nombre
+             ORDER BY ganancia_total DESC
+             LIMIT 8`,
+            params
+        );
+
+        res.json({
+            success: true,
+            data: {
+                resumen: resumenResult.rows[0],
+                semana: semanalResult.rows,
+                meses: mensualResult.rows,
+                metodos_pago: pagosResult.rows,
+                productos_top: productosResult.rows
+            }
+        });
+    } catch (error) {
+        console.error('Error metricas financieras:', error);
+        res.status(500).json({ success: false, error: 'Error al obtener metricas financieras.' });
+    }
+};
+
 module.exports = {
     reporteCigarrosHoy,
     getDashboard,
@@ -457,5 +610,6 @@ module.exports = {
     getKpisDiarios,
     getVentasPorSucursal,
     getHistoricoVentas,
-    getVentasPorTurno
+    getVentasPorTurno,
+    getMetricasFinancieras
 };

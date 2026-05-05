@@ -188,7 +188,8 @@ const procesarVenta = async (req, res) => {
 const getHistorialVentas = async (req, res) => {
     const id_sucursal = resolveSucursalId(req);
     const { id_turno, id_usuario, fecha_desde, fecha_hasta, metodo_pago, tipo_turno } = req.query;
-    const limit = Math.min(Number.parseInt(req.query.limit, 10) || 100, 100000);
+    const limit = Math.min(Number.parseInt(req.query.limit, 10) || 50, 100);
+    const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
 
     try {
         let whereClauses = [];
@@ -240,8 +241,18 @@ const getHistorialVentas = async (req, res) => {
 
         const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
 
+        const countQuery = `
+            SELECT COUNT(*)::int as total
+            FROM ventas_cabecera vc
+            ${whereSql}
+        `;
+        const countResult = await pool.query(countQuery, params);
+        const total = Number(countResult.rows[0]?.total || 0);
+
         params.push(limit);
         const limitIndex = params.length;
+        params.push(offset);
+        const offsetIndex = params.length;
 
         const query = `
             SELECT 
@@ -269,12 +280,16 @@ const getHistorialVentas = async (req, res) => {
             ${whereSql}
             ORDER BY vc.fecha DESC
             LIMIT $${limitIndex}
+            OFFSET $${offsetIndex}
         `;
         const result = await pool.query(query, params);
         res.json({ 
             success: true, 
             data: result.rows,
-            debug: { query, params } 
+            total,
+            limit,
+            offset,
+            hasMore: offset + result.rowCount < total
         });
     } catch (error) {
         console.error('Error al obtener historial de ventas:', error);

@@ -8,7 +8,8 @@ const {
     getKpisDiarios,
     getVentasPorSucursal,
     getHistoricoVentas,
-    getVentasPorTurno
+    getVentasPorTurno,
+    getMetricasFinancieras
 } = require('../controllers/reportController');
 const { verificarAuth } = require('../middlewares/authMiddleware');
 
@@ -20,6 +21,6 @@ router.get('/kpis-diarios', verificarAuth, getKpisDiarios);
 router.get('/ventas-por-sucursal', verificarAuth, getVentasPorSucursal);
 router.get('/historico-ventas', verificarAuth, getHistoricoVentas);
 router.get('/ventas-por-turno', verificarAuth, getVentasPorTurno);
+router.get('/metricas-financieras', verificarAuth, getMetricasFinancieras);
 
 module.exports = router;
-

@@ -1,5 +1,6 @@
 const path = require('path');
 const net = require('net');
+const fs = require('fs');
 const { app, BrowserWindow, ipcMain } = require('electron');
 
 const DEFAULT_SCALE_TIMEOUT_MS = 8000;
@@ -129,6 +130,16 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'src/renderer/index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+}
+
+try {
+  const configPath = path.join(__dirname, 'admin.yml');
+  if (fs.existsSync(configPath)) {
+    fs.copyFileSync(configPath, path.join(__dirname, 'dev-app-update.yml'));
+    fs.copyFileSync(configPath, path.join(__dirname, 'app-update.yml'));
+  }
+} catch (e) {
+  console.error("Error configurando archivos de actualizacion:", e);
 }
 
 app.whenReady().then(() => {

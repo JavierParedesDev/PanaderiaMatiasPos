@@ -317,15 +317,6 @@ def print_ticket(data):
         p.text("\n\n\n")
         p.cut()
 
-        # ── Abrir gaveta SIEMPRE después de imprimir ──────────────────────────
-        try:
-            p.cashdraw(2)
-        except Exception:
-            try:
-                p.cashdraw(5)
-            except Exception:
-                pass
-
         return True, f"Ticket impreso ({source}, {COLS} cols)"
     except Exception as e:
         return False, str(e)

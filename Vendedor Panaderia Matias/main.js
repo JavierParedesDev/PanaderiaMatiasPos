@@ -4,6 +4,10 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 
+// Configuración de escalado para pantallas de alta resolución (DPI)
+app.commandLine.appendSwitch('high-dpi-support', '1');
+app.commandLine.appendSwitch('force-device-scale-factor', '1'); // Puedes comentar esto si prefieres que use el escalado de Windows
+
 try {
   const configPath = path.join(__dirname, 'cajero.yml');
   if (fs.existsSync(configPath)) {
@@ -20,7 +24,6 @@ autoUpdater.autoInstallOnAppQuit = true;
 ipcMain.handle('check-for-updates', async () => {
   try {
     const result = await autoUpdater.checkForUpdatesAndNotify();
-    // Solo devolvemos la info esencial para evitar errores de clonación de objetos complejos
     return { 
       success: true, 
       updateInfo: result ? result.updateInfo : null 
@@ -29,6 +32,26 @@ ipcMain.handle('check-for-updates', async () => {
     console.error("Error checking for updates:", error);
     return { success: false, error: error.message };
   }
+});
+
+autoUpdater.on('update-available', (info) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-available', info);
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-progress', progressObj);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-downloaded', info);
+});
+
+autoUpdater.on('error', (err) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-error', err.message);
 });
 
 ipcMain.handle('open-external', async (event, url) => {
@@ -48,22 +71,51 @@ function escapeHtml(value) {
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 940,
-    minWidth: 1180,
-    minHeight: 760,
+    width: 1280,
+    height: 800,
+    minWidth: 1024,
+    minHeight: 720,
     backgroundColor: '#f3efe6',
     icon: path.join(__dirname, 'assets/icon.ico'),
     show: false,
+    autoHideMenuBar: true, // Asegura que la barra de menú no ocupe espacio
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      devTools: true
+    }
+  });
+
+  mainWindow.setMenu(null);
+
+  // Habilitar shortcuts manuales (Ctrl+Shift+I y Ctrl+R) sin tener menú visible
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+    if (input.control && input.key.toLowerCase() === 'r') {
+      mainWindow.webContents.reload();
+      event.preventDefault();
+    }
+    if (input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+    if (input.key === 'F5') {
+      mainWindow.webContents.reload();
+      event.preventDefault();
     }
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src/renderer/index.html'));
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
+    mainWindow.show();
+    mainWindow.focus();
+  });
 }
 
 function resolveAppAsset(...segments) {
@@ -125,10 +177,14 @@ function tryParsePrinterResult(rawText) {
 }
 
 ipcMain.handle('toggle-fullscreen', async () => {
-  const win = BrowserWindow.getFocusedWindow();
+  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
   if (win) {
     const isFS = win.isFullScreen();
     win.setFullScreen(!isFS);
+    // En Windows, a veces es necesario forzar el foco tras cambiar a FS
+    if (!isFS) {
+      win.focus();
+    }
     return !isFS;
   }
   return false;

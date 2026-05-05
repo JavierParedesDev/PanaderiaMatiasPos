@@ -6,14 +6,14 @@ import { showNotification } from '../../utils/notifications.js';
 
 export function renderCajaSkeleton() {
   return `
-    <div class="h-full overflow-y-auto px-10 py-10 space-y-8 pb-20">
+    <div class="h-full overflow-y-auto px-4 md:px-10 py-6 md:py-10 space-y-6 md:space-y-8 pb-20">
       <header class="flex items-center justify-between shrink-0">
         <div>
-          <h1 class="text-3xl font-black text-[#2d221b] tracking-tighter">Mi Turno y Caja</h1>
+          <h1 class="text-2xl md:text-3xl font-black text-[#2d221b] tracking-tighter">Mi Turno y Caja</h1>
           <p class="text-sm font-medium text-[#705f52] mt-1">Gestiona la apertura y cierre de tu terminal de venta.</p>
         </div>
-        <button id="btn-volver-venta" class="px-10 h-16 bg-cafe text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-cafe/20 hover:bg-[#4a2f1d] transition-all flex items-center gap-4">
-           <span class="text-2xl">⇠</span> Volver a Venta
+        <button id="btn-volver-venta" class="px-4 md:px-10 h-12 md:h-16 bg-cafe text-white font-black uppercase tracking-widest text-[10px] md:text-[11px] shadow-2xl shadow-cafe/20 hover:bg-[#4a2f1d] transition-all flex items-center gap-2 md:gap-4">
+           <span class="text-xl md:text-2xl">⇠</span> Volver a Venta
         </button>
       </header>
 
@@ -266,14 +266,14 @@ export async function hydrateCajaView() {
       container.innerHTML = `
         <div class="grid gap-8 lg:grid-cols-2">
           <!-- Info Turno -->
-          <section class="panel p-8 bg-white border-t-8 border-t-verdeok shadow-2xl relative overflow-hidden group">
-            <div class="absolute -right-10 -top-10 text-[180px] text-verdeok/5 font-black uppercase pointer-events-none select-none">ACT</div>
-            <div class="relative z-10 space-y-8">
-              <div class="flex items-center gap-4 border-b border-borde/20 pb-6">
-                <div class="w-16 h-16 rounded-3xl bg-verdeok text-white flex items-center justify-center text-3xl shadow-xl shadow-verdeok/20">👤</div>
+          <section class="panel p-4 md:p-8 bg-white border-t-8 border-t-verdeok shadow-2xl relative overflow-hidden group">
+            <div class="absolute -right-10 -top-10 text-[120px] md:text-[180px] text-verdeok/5 font-black uppercase pointer-events-none select-none">ACT</div>
+            <div class="relative z-10 space-y-6 md:space-y-8">
+              <div class="flex items-center gap-4 border-b border-borde/20 pb-4 md:pb-6">
+                <div class="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-verdeok text-white flex items-center justify-center text-2xl md:text-3xl shadow-xl shadow-verdeok/20">👤</div>
                 <div>
-                  <h3 class="text-2xl font-black text-[#2d221b] tracking-tighter">${escapeHtml(miTurno.nombre_usuario || username)}</h3>
-                  <p class="text-xs font-bold text-verdeok uppercase tracking-widest">Turno Abierto • ${escapeHtml(miTurno.nombre_sucursal)}</p>
+                  <h3 class="text-xl md:text-2xl font-black text-[#2d221b] tracking-tighter">${escapeHtml(miTurno.nombre_usuario || username)}</h3>
+                  <p class="text-[10px] md:text-xs font-bold text-verdeok uppercase tracking-widest">Turno Abierto • ${escapeHtml(miTurno.nombre_sucursal)}</p>
                 </div>
               </div>
 
@@ -289,12 +289,12 @@ export async function hydrateCajaView() {
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
-                <button id="btn-abrir-retiro" class="btn-primary bg-rojoaviso hover:bg-rojoaviso/90 shadow-xl shadow-rojoaviso/20 py-5 text-white font-bold">
-                  Registrar Retiro
+              <div class="grid grid-cols-2 gap-3 md:gap-4">
+                <button id="btn-abrir-retiro" class="btn-primary bg-rojoaviso hover:bg-rojoaviso/90 shadow-xl shadow-rojoaviso/20 py-4 md:py-5 text-white font-bold text-xs md:text-sm">
+                   Retiro
                 </button>
-                <button id="btn-preparar-cierre" class="btn-primary bg-verdeok hover:bg-verdeok/90 shadow-xl shadow-verdeok/20 py-5 text-white font-bold">
-                  Cerrar Turno
+                <button id="btn-preparar-cierre" class="btn-primary bg-verdeok hover:bg-verdeok/90 shadow-xl shadow-verdeok/20 py-4 md:py-5 text-white font-bold text-xs md:text-sm">
+                  Cerrar Caja
                 </button>
               </div>
             </div>
@@ -306,29 +306,29 @@ export async function hydrateCajaView() {
             <div class="relative z-10 h-full flex flex-col">
               <h3 class="text-xl font-black uppercase tracking-tighter mb-8">Ventas de este Turno</h3>
               <div class="space-y-6 flex-1">
-                 <div class="grid grid-cols-4 gap-4">
-                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
-                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Efectivo</p>
-                       <p class="text-xl font-black tracking-tighter text-white">${formatCurrency(totalEfectivo)}</p>
+                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                    <div class="p-3 md:p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Efectivo</p>
+                       <p class="text-lg md:text-xl font-black tracking-tighter text-white">${formatCurrency(totalEfectivo)}</p>
                     </div>
-                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
-                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Tarjeta</p>
-                       <p class="text-xl font-black tracking-tighter text-[#f8efe1]">${formatCurrency(totalTarjeta)}</p>
+                    <div class="p-3 md:p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Tarjeta</p>
+                       <p class="text-lg md:text-xl font-black tracking-tighter text-[#f8efe1]">${formatCurrency(totalTarjeta)}</p>
                     </div>
-                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
-                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Transfer.</p>
-                       <p class="text-xl font-black tracking-tighter text-[#f8efe1]">${formatCurrency(totalTransferencia)}</p>
+                    <div class="p-3 md:p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Transfer.</p>
+                       <p class="text-lg md:text-xl font-black tracking-tighter text-[#f8efe1]">${formatCurrency(totalTransferencia)}</p>
                     </div>
-                    <div class="p-4 rounded-xl bg-white/5 border border-white/10">
-                       <p class="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Retiros</p>
-                       <p class="text-xl font-black tracking-tighter text-[#f6d7ad]">${formatCurrency(-totalRetiros)}</p>
+                    <div class="p-3 md:p-4 rounded-xl bg-white/5 border border-white/10">
+                       <p class="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Retiros</p>
+                       <p class="text-lg md:text-xl font-black tracking-tighter text-[#f6d7ad]">${formatCurrency(-totalRetiros)}</p>
                     </div>
                  </div>
 
                  <div class="p-4 rounded-xl bg-white/10 border border-white/20 mt-4">
-                    <p class="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1">Total Efectivo a Rendir</p>
-                    <p class="text-3xl font-black tracking-tighter text-[#f6d7ad]">${formatCurrency(totalEsperadoEfectivo)}</p>
-                    <p class="text-[10px] text-white/35 font-bold mt-1">Apertura + efectivo - retiros</p>
+                    <p class="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1">Total Efectivo a Rendir</p>
+                    <p class="text-2xl md:text-3xl font-black tracking-tighter text-[#f6d7ad]">${formatCurrency(totalEsperadoEfectivo)}</p>
+                    <p class="text-[8px] md:text-[10px] text-white/35 font-bold mt-1">Apertura + efectivo - retiros</p>
                  </div>
 
               </div>
@@ -351,17 +351,30 @@ export async function hydrateCajaView() {
         </section>
         
         <!-- Sección de Actualizaciones -->
-        <section class="panel p-6 bg-white border border-borde/20 shadow-md relative overflow-hidden mt-8 flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <span class="text-3xl">📦</span>
-            <div>
-              <h3 class="text-sm font-black text-cafe uppercase tracking-widest">Actualizaciones del Sistema</h3>
-              <p class="text-xs text-cafe/50 font-medium">Revisa si hay nuevas versiones disponibles en el repositorio de GitHub.</p>
+        <section class="panel p-6 bg-white border border-borde/20 shadow-md relative overflow-hidden mt-8">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <span class="text-3xl">📦</span>
+              <div>
+                <h3 class="text-sm font-black text-cafe uppercase tracking-widest">Actualizaciones del Sistema</h3>
+                <p class="text-xs text-cafe/50 font-medium">Revisa si hay nuevas versiones disponibles en el repositorio de GitHub.</p>
+              </div>
+            </div>
+            <button id="btn-actualizar-github" class="px-6 py-3 bg-cafe hover:bg-[#4a2f1d] text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-cafe/10 uppercase tracking-widest">
+              📥 Buscar en GitHub
+            </button>
+          </div>
+          
+          <!-- Barra de Progreso (Oculta por defecto) -->
+          <div id="update-progress-container" class="hidden mt-6 pt-6 border-t border-borde/10 animate-fadeIn">
+            <div class="flex items-center justify-between mb-2">
+              <span id="update-status-text" class="text-[10px] font-black text-cafe/60 uppercase tracking-widest">Descargando actualización...</span>
+              <span id="update-percent-text" class="text-[10px] font-black text-cafe italic">0%</span>
+            </div>
+            <div class="w-full h-3 bg-papel rounded-full overflow-hidden border border-borde/20">
+              <div id="update-progress-bar" class="h-full bg-caramelo transition-all duration-300" style="width: 0%"></div>
             </div>
           </div>
-          <button id="btn-actualizar-github" class="px-6 py-3 bg-cafe hover:bg-[#4a2f1d] text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-cafe/10 uppercase tracking-widest">
-            📥 Buscar en GitHub
-          </button>
         </section>
         <!-- Sección de Impresoras -->
         <section class="panel p-6 bg-white border border-borde/20 shadow-md relative overflow-hidden mt-6 flex flex-col gap-4">
@@ -395,16 +408,67 @@ export async function hydrateCajaView() {
       `;
 
       const btnActualizar = document.querySelector('#btn-actualizar-github');
+      const progressContainer = document.querySelector('#update-progress-container');
+      const progressBar = document.querySelector('#update-progress-bar');
+      const statusText = document.querySelector('#update-status-text');
+      const percentText = document.querySelector('#update-percent-text');
+
+      if (window.electronAPI) {
+        // Escuchar eventos de progreso
+        window.electronAPI.onUpdateAvailable((info) => {
+          if (progressContainer) progressContainer.classList.remove('hidden');
+          if (statusText) statusText.textContent = `NUEVA VERSIÓN DETECTADA (${info.version})`;
+          if (btnActualizar) {
+             btnActualizar.disabled = true;
+             btnActualizar.textContent = 'Actualizando...';
+          }
+        });
+
+        window.electronAPI.onUpdateProgress((progress) => {
+          if (progressContainer) progressContainer.classList.remove('hidden');
+          const percent = Math.round(progress.percent || 0);
+          if (progressBar) progressBar.style.width = `${percent}%`;
+          if (percentText) percentText.textContent = `${percent}%`;
+          if (statusText) statusText.textContent = `DESCARGANDO ACTUALIZACIÓN... (${(progress.bytesPerSecond / 1024 / 1024).toFixed(2)} MB/s)`;
+        });
+
+        window.electronAPI.onUpdateDownloaded((info) => {
+          if (progressBar) progressBar.style.width = '100%';
+          if (percentText) percentText.textContent = '100%';
+          if (statusText) {
+            statusText.textContent = '¡DESCARGA COMPLETADA! REINICIANDO...';
+            statusText.className = "text-[10px] font-black text-verdeok uppercase tracking-widest";
+          }
+          showNotification('Actualización descargada. El sistema se reiniciará en unos segundos.', 'success');
+        });
+
+        window.electronAPI.onUpdateError((error) => {
+          if (statusText) {
+            statusText.textContent = 'ERROR EN LA ACTUALIZACIÓN';
+            statusText.className = "text-[10px] font-black text-rojoaviso uppercase tracking-widest";
+          }
+          if (btnActualizar) {
+            btnActualizar.disabled = false;
+            btnActualizar.textContent = '📥 Buscar en GitHub';
+          }
+          showNotification('Error al actualizar: ' + error, 'error');
+        });
+      }
+
       btnActualizar?.addEventListener('click', async () => {
         if (window.electronAPI && window.electronAPI.checkForUpdates) {
           btnActualizar.disabled = true;
-          btnActualizar.textContent = 'Buscando/Instalando...';
+          btnActualizar.textContent = 'Buscando...';
           try {
             const res = await window.electronAPI.checkForUpdates();
             if (res.success) {
-              // showNotification puede no estar importado directamente, usemos alert o confirm temporalmente, o ver si existe en el scope
-              // En cajaView existe showNotification ya usado en la línea 337.
-              showNotification('¡Verificando actualizaciones en segundo plano!', 'success');
+              if (res.updateInfo) {
+                showNotification('Buscando versión ' + res.updateInfo.version, 'success');
+              } else {
+                showNotification('Ya tienes la última versión instalada.', 'success');
+                btnActualizar.disabled = false;
+                btnActualizar.textContent = '📥 Buscar en GitHub';
+              }
             } else {
               showNotification('Error: ' + res.error, 'error');
               btnActualizar.disabled = false;

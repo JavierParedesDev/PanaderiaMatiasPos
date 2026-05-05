@@ -19,6 +19,22 @@ const parseOptionalInteger = (value) => {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
+const parsePagination = (query = {}, defaults = {}) => {
+    const defaultLimit = defaults.limit || 50;
+    const maxLimit = defaults.maxLimit || 100;
+    const requestedLimit = Number.parseInt(query.limit, 10);
+    const requestedOffset = Number.parseInt(query.offset, 10);
+
+    return {
+        limit: Number.isInteger(requestedLimit) && requestedLimit > 0
+            ? Math.min(requestedLimit, maxLimit)
+            : defaultLimit,
+        offset: Number.isInteger(requestedOffset) && requestedOffset >= 0
+            ? requestedOffset
+            : 0
+    };
+};
+
 const parsePositiveNumber = (value) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -406,8 +422,31 @@ const eliminarDuplicadosBalanza = async (req, res) => {
  */
 const getProductos = async (req, res) => {
     const id_sucursal = resolveSucursalId(req);
+    const { limit, offset } = parsePagination(req.query, { limit: 40, maxLimit: 100 });
+    const busqueda = String(req.query.busqueda || req.query.search || '').trim();
+    const categoria = String(req.query.categoria || '').trim();
 
     try {
+        const params = [id_sucursal];
+        const whereClauses = [];
+
+        if (busqueda) {
+            params.push(`%${busqueda}%`);
+            whereClauses.push(`(
+                p.nombre ILIKE $${params.length}
+                OR CAST(p.codigo_barra_externo AS TEXT) ILIKE $${params.length}
+                OR CAST(p.codigo_interno AS TEXT) ILIKE $${params.length}
+                OR CAST(p.plu_balanza AS TEXT) ILIKE $${params.length}
+            )`);
+        }
+
+        if (categoria) {
+            params.push(categoria);
+            whereClauses.push(`c.nombre ILIKE '%' || $${params.length} || '%'`);
+        }
+
+        const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
         const query = `
             SELECT
                 p.id,
@@ -438,10 +477,32 @@ const getProductos = async (req, res) => {
             FROM productos p
             LEFT JOIN categorias c ON p.id_categoria = c.id
             LEFT JOIN inventarios i ON p.id = i.id_producto AND i.id_sucursal = $1
-            ORDER BY p.nombre ASC;
+            ${whereSql}
+            ORDER BY p.nombre ASC
+            LIMIT $${params.length + 1}
+            OFFSET $${params.length + 2};
         `;
-        const result = await pool.query(query, [id_sucursal]);
-        res.json({ success: true, id_sucursal, cantidad: result.rowCount, data: result.rows });
+        const countQuery = `
+            SELECT COUNT(*)::int as total
+            FROM productos p
+            LEFT JOIN categorias c ON p.id_categoria = c.id
+            LEFT JOIN inventarios i ON p.id = i.id_producto AND i.id_sucursal = $1
+            ${whereSql};
+        `;
+        const result = await pool.query(query, [...params, limit, offset]);
+        const countResult = await pool.query(countQuery, params);
+        const total = Number(countResult.rows[0]?.total || 0);
+
+        res.json({
+            success: true,
+            id_sucursal,
+            cantidad: result.rowCount,
+            total,
+            limit,
+            offset,
+            hasMore: offset + result.rowCount < total,
+            data: result.rows
+        });
     } catch (error) {
         console.error('Error al obtener productos:', error);
         res.status(500).json({ success: false, error: 'Error al obtener el cat logo.' });

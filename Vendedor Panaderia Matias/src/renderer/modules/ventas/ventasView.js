@@ -4,14 +4,14 @@ import { formatCurrency, escapeHtml } from '../../utils/formatters.js';
 
 export function renderVentasSkeleton() {
   return `
-    <div class="px-10 py-10 space-y-10 h-full flex flex-col bg-crema/5 overflow-hidden">
+    <div class="px-4 md:px-10 py-6 md:py-10 space-y-6 md:space-y-10 h-full flex flex-col bg-crema/5 overflow-hidden">
       <header class="flex items-center justify-between shrink-0">
         <div>
-           <h1 class="text-4xl font-black text-[#2d221b] tracking-tighter italic uppercase">Historial de Mis Tickets</h1>
-           <p class="text-[10px] font-black text-cafe/40 uppercase tracking-[0.4em] mt-2 ml-1">Revisión de las últimas 100 ventas del turno actual</p>
+           <h1 class="text-2xl md:text-4xl font-black text-[#2d221b] tracking-tighter italic uppercase">Historial de Mis Tickets</h1>
+           <p class="text-[9px] md:text-[10px] font-black text-cafe/40 uppercase tracking-[0.4em] mt-1 md:mt-2 ml-1">Revisión de las últimas 100 ventas del turno actual</p>
         </div>
-        <button id="btn-volver-venta" class="px-10 h-16 bg-cafe text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-cafe/20 hover:bg-[#4a2f1d] transition-all flex items-center gap-4">
-           <span class="text-2xl">⇠</span> Volver a Venta
+        <button id="btn-volver-venta" class="px-4 md:px-10 h-12 md:h-16 bg-cafe text-white font-black uppercase tracking-widest text-[10px] md:text-[11px] shadow-2xl shadow-cafe/20 hover:bg-[#4a2f1d] transition-all flex items-center gap-2 md:gap-4">
+           <span class="text-xl md:text-2xl">⇠</span> Volver a Venta
         </button>
       </header>
       <div id="ventas-content" class="flex-1 overflow-hidden">
@@ -64,10 +64,10 @@ export async function hydrateVentasView() {
 
     container.innerHTML = `
       <div class="bg-white border border-borde/20 shadow-2xl overflow-hidden h-full flex flex-col">
-        <div class="px-10 py-10 border-b border-borde/10 flex items-center justify-between bg-papel flex-wrap gap-6">
+        <div class="px-4 md:px-10 py-6 md:py-10 border-b border-borde/10 flex items-center justify-between bg-papel flex-wrap gap-4 md:gap-6">
           <div>
-            <h2 class="text-2xl font-black text-[#2d221b] uppercase tracking-tighter">Tickets del Turno</h2>
-            <p class="text-[11px] font-black text-cafe/30 uppercase tracking-[0.2em] mt-2">Registros en memoria local / sincronizados: <span id="ventas-total-count">${ventasFiltradas.length}</span></p>
+            <h2 class="text-xl md:text-2xl font-black text-[#2d221b] uppercase tracking-tighter">Tickets del Turno</h2>
+            <p class="text-[10px] md:text-[11px] font-black text-cafe/30 uppercase tracking-[0.2em] mt-1 md:mt-2">Registros: <span id="ventas-total-count">${ventasFiltradas.length}</span></p>
           </div>
           <div class="flex items-center gap-6">
             <!-- Buscador -->
@@ -91,9 +91,9 @@ export async function hydrateVentasView() {
           <table class="w-full text-left border-collapse">
             <thead class="sticky top-0 bg-white z-10 font-black">
               <tr class="text-[11px] font-black uppercase tracking-[0.3em] text-cafe/30 border-b border-borde/10 bg-papel/50">
-                <th class="px-10 py-6">Identificador</th>
-                <th class="px-10 py-6">Fecha y Hora</th>
-                <th class="px-10 py-6 text-right">Monto Neto</th>
+                <th class="px-4 md:px-10 py-4 md:py-6 text-[9px] md:text-[11px]">Identificador</th>
+                <th class="px-4 md:px-10 py-4 md:py-6 text-[9px] md:text-[11px]">Fecha y Hora</th>
+                <th class="px-4 md:px-10 py-4 md:py-6 text-[9px] md:text-[11px] text-right">Monto Neto</th>
               </tr>
             </thead>
             <tbody id="cuerpo-tabla-ventas" class="divide-y divide-borde/10 text-sm">
@@ -141,16 +141,16 @@ export async function hydrateVentasView() {
         emptyBox.classList.add('hidden');
         tbody.innerHTML = itemsToShow.map(v => `
           <tr class="hover:bg-cafe/[0.02] transition-all group">
-            <td class="px-10 py-8">
-              <span class="px-5 py-3 bg-cafe text-white font-black text-[11px] tracking-[0.2em] uppercase shadow-lg shadow-cafe/10">Folio #${v.folio_interno}</span>
+            <td class="px-4 md:px-10 py-4 md:py-8">
+              <span class="px-3 md:px-5 py-2 md:py-3 bg-cafe text-white font-black text-[9px] md:text-[11px] tracking-[0.2em] uppercase shadow-lg shadow-cafe/10">Folio #${v.folio_interno}</span>
             </td>
-            <td class="px-10 py-8">
-              <p class="text-base font-black text-[#2d221b] tracking-tighter">${new Date(v.fecha).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} HRS</p>
-              <p class="text-[11px] font-bold text-cafe/30 uppercase mt-1 tracking-wider">${new Date(v.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+            <td class="px-4 md:px-10 py-4 md:py-8">
+              <p class="text-sm md:text-base font-black text-[#2d221b] tracking-tighter">${new Date(v.fecha).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} HRS</p>
+              <p class="text-[9px] md:text-[11px] font-bold text-cafe/30 uppercase mt-0.5 md:mt-1 tracking-wider">${new Date(v.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
             </td>
-            <td class="px-10 py-8 text-right">
-              <p class="text-3xl font-black text-cafe tracking-tighter">${formatCurrency(v.total_venta)}</p>
-              <p class="text-[10px] font-bold text-cafe/20 uppercase tracking-[0.4em] mt-2">${v.metodo_pago || 'EFECTIVO'}</p>
+            <td class="px-4 md:px-10 py-4 md:py-8 text-right">
+              <p class="text-xl md:text-3xl font-black text-cafe tracking-tighter">${formatCurrency(v.total_venta)}</p>
+              <p class="text-[9px] md:text-[10px] font-bold text-cafe/20 uppercase tracking-[0.4em] mt-1 md:mt-2">${v.metodo_pago || 'EFECTIVO'}</p>
             </td>
           </tr>
         `).join('');

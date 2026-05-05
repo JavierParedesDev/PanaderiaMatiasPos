@@ -13,6 +13,7 @@ let searchResults = [];
 let currentShift = null;
 let paymentMethods = [];
 let isProcessingSale = false;
+let refreshInterval = null;
 const CART_STORAGE_KEY = "panaderia-matias-pos-cart";
 
 function loadCartFromStorage() {
@@ -81,84 +82,77 @@ export function renderPosSkeleton() {
     <div class="h-full flex bg-[#f0f2f5] overflow-hidden">
       
       <!-- COLUMNA CENTRAL: TICKET (Items más pequeños) -->
-      <main class="flex-1 flex flex-col p-10 gap-8 min-w-0">
+      <main class="flex-1 flex flex-col p-4 md:p-10 gap-4 md:gap-8 min-w-0">
       <header class="flex items-center justify-between px-6">
-        <h2 class="text-3xl font-black text-cafe uppercase tracking-tighter italic">Venta actual <span id="cart-count" class="text-caramelo ml-2">(0)</span></h2>
+        <h2 class="text-2xl md:text-3xl font-black text-cafe uppercase tracking-tighter italic">Venta actual <span id="cart-count" class="text-caramelo ml-2">(0)</span></h2>
       </header>
 
         <div id="cart-container" class="flex-1 bg-white border border-borde/40 shadow-xl overflow-hidden flex flex-col">
-          <div class="flex items-center px-8 py-5 border-b border-borde/10 text-[10px] font-black uppercase tracking-[0.2em] text-cafe/30 shrink-0">
+          <div class="flex items-center px-4 md:px-8 py-3 md:py-5 border-b border-borde/10 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-cafe/30 shrink-0">
              <div class="flex-1">Descripción del Producto</div>
-             <div class="w-40 text-center">Cantidad</div>
-             <div class="w-40 text-right pr-10">Precio Unit.</div>
-             <div class="w-48 text-right pr-6">Subtotal</div>
-             <div class="w-12"></div>
+             <div class="w-24 md:w-40 text-center">Cantidad</div>
+             <div class="w-24 md:w-40 text-right md:pr-10">Precio Unit.</div>
+             <div class="w-32 md:w-48 text-right md:pr-6">Subtotal</div>
+             <div class="w-10 md:w-12"></div>
           </div>
 
           <div id="cart-items" class="flex-1 overflow-y-auto space-y-px custom-scrollbar">
              <div class="h-full flex flex-col items-center justify-center opacity-10">
-                <img src="./assets/logo.png" class="w-32 mb-6 grayscale">
-                <p class="text-lg font-black uppercase tracking-[0.3em]">Esperando Selección...</p>
+                <img src="./assets/logo.png" class="w-24 md:w-32 mb-6 grayscale">
+                <p class="text-base md:text-lg font-black uppercase tracking-[0.3em]">Esperando Selección...</p>
              </div>
           </div>
         </div>
       </main>
 
       <!-- COLUMNA DERECHA: PAGO (Checkout optimizado para visibilidad) -->
-      <aside class="w-[420px] bg-white border-l border-borde/40 flex flex-col shadow-2xl z-20">
-        <div class="flex-1 p-10 space-y-8 overflow-y-auto custom-scrollbar">
+      <aside class="w-[320px] md:w-[420px] bg-white border-l border-borde/40 flex flex-col shadow-2xl z-20">
+        <div class="flex-1 p-2 md:p-8 space-y-3 md:space-y-6 overflow-y-auto custom-scrollbar">
           
           <!-- Resumen de Totales -->
-          <div class="space-y-4">
-            <div class="pt-6 border-t border-borde/40 flex flex-col items-end">
-               <span class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.3em] mb-1">Total a Cobrar</span>
-               <span id="cart-total" class="text-5xl font-black text-cafe tracking-tighter leading-none">$ 0</span>
+          <div class="space-y-2">
+            <div class="pt-2 border-t border-borde/40 flex flex-col items-end">
+               <span class="text-[8px] md:text-[10px] font-black text-cafe/30 uppercase tracking-[0.3em] mb-0.5">Total a Cobrar</span>
+               <span id="cart-total" class="text-2xl md:text-4xl font-black text-cafe tracking-tighter leading-none">$ 0</span>
             </div>
           </div>
 
-          <!-- Matriz de Pago Simplificada (Espacios reducidos) -->
-          <div class="space-y-4">
-             <p class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.4em] text-center italic">Método de Recepción</p>
-             <div class="grid grid-cols-1 gap-3">
-                <button class="pay-method-btn active h-20 flex-row justify-start px-6 gap-6" data-method="Efectivo">
-                   <span class="text-3xl">💵</span>
-                   <div class="text-left">
-                     <span class="block text-xs font-black uppercase tracking-widest">Efectivo</span>
-                     <span class="text-[8px] font-bold opacity-50 uppercase mt-0.5">Dinero en mano</span>
-                   </div>
+          <!-- Matriz de Pago Compacta (3 columnas para ahorrar espacio) -->
+          <div class="space-y-3">
+             <p class="text-[8px] md:text-[10px] font-black text-cafe/30 uppercase tracking-[0.4em] text-center italic">Método de Recepción</p>
+             <div class="grid grid-cols-3 gap-2">
+                <button class="pay-method-btn active flex-col justify-center items-center py-2 h-auto gap-1 border-2" data-method="Efectivo">
+                   <span class="text-lg md:text-2xl">💵</span>
+                   <span class="block text-[8px] md:text-[10px] font-black uppercase tracking-tighter">Efectivo</span>
                 </button>
-                <button class="pay-method-btn h-20 flex-row justify-start px-6 gap-6" data-method="Tarjeta">
-                   <span class="text-3xl">💳</span>
-                   <div class="text-left">
-                     <span class="block text-xs font-black uppercase tracking-widest">Tarjeta</span>
-                     <span class="text-[8px] font-bold opacity-50 uppercase mt-0.5">Deb/Cred</span>
-                   </div>
+
+                <button class="pay-method-btn flex-col justify-center items-center py-2 h-auto gap-1 border-2" data-method="Tarjeta">
+                   <span class="text-lg md:text-2xl">💳</span>
+                   <span class="block text-[8px] md:text-[10px] font-black uppercase tracking-tighter">Tarjeta</span>
                 </button>
-                <button class="pay-method-btn h-20 flex-row justify-start px-6 gap-6" data-method="Mixto">
-                   <span class="text-3xl">🌓</span>
-                   <div class="text-left">
-                     <span class="block text-xs font-black uppercase tracking-widest text-[#3b82f6]">Mixto</span>
-                     <span class="text-[8px] font-bold opacity-50 uppercase mt-0.5 text-[#3b82f6]/60">Combinado</span>
-                   </div>
+
+                <button class="pay-method-btn flex-col justify-center items-center py-2 h-auto gap-1 border-2" data-method="Mixto">
+                   <span class="text-lg md:text-2xl">🌓</span>
+                   <span class="block text-[8px] md:text-[10px] font-black uppercase tracking-tighter text-[#3b82f6]">Mixto</span>
                 </button>
              </div>
           </div>
         </div>
 
         <!-- Botón Cobrar (VERDE / CUADRADO TOTAL AL FONDO) -->
-                <div class="px-4 pb-3">
-          <button id="internal-consumption-button" class="w-full h-16 bg-cafe/10 hover:bg-cafe text-cafe hover:text-white border border-cafe/20 rounded-xl font-black uppercase tracking-widest text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+        <div class="px-2 pb-1">
+          <button id="internal-consumption-button" class="w-full h-8 md:h-14 bg-cafe/10 hover:bg-cafe text-cafe hover:text-white border border-cafe/20 rounded-lg font-black uppercase tracking-widest text-[8px] md:text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed" disabled>
             Consumo Interno
           </button>
         </div>
 
-      <div class="px-4 pb-3">
-       <button id="quick-print-toggle" class="w-full py-3 rounded-xl border border-borde/30 text-[10px] font-black uppercase tracking-[0.3em] text-cafe/60 hover:bg-papel transition-all">Ticket: ON</button>
+      <div class="px-2 pb-1">
+       <button id="quick-print-toggle" class="w-full py-1.5 rounded-lg border border-borde/30 text-[7px] md:text-[9px] font-black uppercase tracking-[0.2em] text-cafe/60 hover:bg-papel transition-all">Ticket: ON</button>
       </div>
 
-      <button id="pay-button" class="btn-pos-pay-success h-28 flex flex-col items-center justify-center gap-1 active:brightness-90 transition-all font-black italic uppercase" disabled>
-        <span class="text-[10px] opacity-60 tracking-[0.3em]">Finalizar Venta</span>
-        <span class="text-2xl tracking-tighter" id="pay-button-text">COBRAR $ 0</span>
+      <button id="pay-button" class="btn-pos-pay-success h-12 md:h-20 flex flex-col items-center justify-center gap-0 active:brightness-90 transition-all font-black italic uppercase shrink-0" disabled>
+        <span class="text-[7px] md:text-[9px] opacity-60 tracking-[0.3em]">Finalizar Venta</span>
+        <span class="text-base md:text-xl tracking-tighter" id="pay-button-text">COBRAR $ 0</span>
       </button>
       </aside>
     </div>
@@ -180,6 +174,35 @@ export function renderPosSkeleton() {
         <div class="flex gap-4">
            <button id="cancel-mixed" class="flex-1 py-4 rounded-xl font-black uppercase text-xs tracking-widest text-cafe/40 hover:bg-papel">Cancelar</button>
            <button id="confirm-mixed" class="flex-[2] py-4 rounded-xl bg-caramelo text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-caramelo/30">Confirmar Pago</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Pago en Efectivo -->
+    <div id="cash-payment-modal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4 bg-cafe/90 backdrop-blur-md">
+      <div class="panel w-full max-w-sm bg-white p-10 space-y-8 animate-zoomIn">
+        <h2 class="text-2xl font-black text-cafe uppercase italic tracking-tighter">Pago en Efectivo</h2>
+        
+        <div class="p-6 bg-papel/50 rounded-2xl border-2 border-dashed border-borde/40 text-center">
+            <p class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.3em] mb-2">Total a Pagar</p>
+            <p id="cash-modal-total" class="text-4xl font-black text-cafe tracking-tighter">$ 0</p>
+        </div>
+
+        <div class="space-y-6">
+           <div class="space-y-2">
+              <label class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.2em]">Efectivo Recibido</label>
+              <input id="cash-received" type="number" step="1" class="w-full h-16 bg-papel border-2 border-borde/40 rounded-2xl px-6 text-3xl font-black outline-none focus:border-caramelo transition-all" placeholder="0">
+           </div>
+           
+           <div class="p-6 bg-verdeok/5 rounded-2xl border border-verdeok/20 flex items-center justify-between">
+              <span class="text-xs font-black text-verdeok uppercase tracking-widest">Vuelto</span>
+              <span id="cash-change" class="text-3xl font-black text-verdeok tracking-tighter">$ 0</span>
+           </div>
+        </div>
+
+        <div class="flex gap-4">
+           <button id="cancel-cash" class="flex-1 py-4 rounded-xl font-black uppercase text-xs tracking-widest text-cafe/40 hover:bg-papel">Cancelar</button>
+           <button id="confirm-cash" class="flex-[2] py-4 rounded-xl bg-cafe text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-cafe/30">Finalizar Venta</button>
         </div>
       </div>
     </div>
@@ -224,9 +247,15 @@ export function renderPosSkeleton() {
           <h2 class="text-3xl font-black text-cafe tracking-tighter uppercase italic">Venta Registrada</h2>
           <p class="text-[10px] font-bold text-cafe/40 uppercase tracking-[0.4em] mt-2">Folio #<span id="modal-folio">---</span></p>
         </div>
-        <div class="p-6 bg-[#f8f5f0] rounded-[2rem] border-2 border-dashed border-borde/60">
-           <p class="text-[9px] font-black text-cafe/30 uppercase tracking-[0.3em] mb-2">Total Recaudado</p>
-           <p id="modal-payment-total" class="text-4xl font-black text-verdeok tracking-tighter">$ 0</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="p-6 bg-[#f8f5f0] rounded-[2rem] border-2 border-dashed border-borde/60">
+             <p class="text-[9px] font-black text-cafe/30 uppercase tracking-[0.3em] mb-2">Total Recaudado</p>
+             <p id="modal-payment-total" class="text-3xl font-black text-verdeok tracking-tighter">$ 0</p>
+          </div>
+          <div id="modal-change-container" class="p-6 bg-papel/50 rounded-[2rem] border-2 border-dashed border-borde/60 hidden">
+             <p class="text-[9px] font-black text-cafe/30 uppercase tracking-[0.3em] mb-2">Vuelto Entregado</p>
+             <p id="modal-payment-change" class="text-3xl font-black text-cafe tracking-tighter">$ 0</p>
+          </div>
         </div>
         <button id="close-payment-modal" class="w-full py-5 rounded-xl bg-cafe text-white font-black uppercase tracking-[0.3em] shadow-2xl shadow-cafe/40 hover:scale-[1.02] transition-transform">Siguiente Ticket 🥖</button>
       </div>
@@ -402,6 +431,30 @@ export async function hydratePosView() {
     }
   }
 
+  async function refreshProducts() {
+    // Si se está procesando una venta, esperamos al siguiente ciclo
+    if (isProcessingSale) return;
+    
+    try {
+      const pRes = await getProductos();
+      const updatedProducts = (pRes.data || []).filter(p => p.activo);
+      
+      // Actualizamos allProducts preservando la estructura necesaria
+      allProducts = updatedProducts.map(p => ({
+        ...p,
+        stock_actual: getStock(p)
+      }));
+
+      // Sincronizamos el carrito (por si cambió el stock crítico de algo ya en el carro)
+      syncCartWithProducts();
+      updateCartUI();
+      
+      console.log("Productos refrescados automáticamente:", new Date().toLocaleTimeString());
+    } catch (e) {
+      console.warn("Error en auto-refresco de productos:", e);
+    }
+  }
+
   const openShiftForm = document.querySelector("#open-shift-form");
   openShiftForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -413,9 +466,13 @@ export async function hydratePosView() {
       const res = await abrirTurno({ tipo_turno: tipo, monto_apertura: monto });
 
       currentShift = res.turno;
-      document.querySelector("#open-shift-modal").classList.add("hidden");
-      showNotification("¡TURNO ABIERTO! Ya puedes vender.", "success");
-      searchInput.focus();
+      document.querySelector("#open-shift-modal")?.classList.add("hidden");
+      showNotification("TURNO ABIERTO CORRECTAMENTE", "success");
+
+      // Abrir gaveta automáticamente al iniciar el turno (fondo inicial)
+      if (window.electronAPI?.printTicket) {
+        window.electronAPI.printTicket({ skip_print: true }).catch(() => {});
+      }
     } catch (error) {
       showNotification(error.message || "Error al abrir turno", "error");
     }
@@ -722,45 +779,45 @@ export async function hydratePosView() {
       cartItemsContainer.innerHTML = cart
         .map(
           (item, idx) => `
-         <div class="flex items-center px-8 py-8 bg-white border-b border-borde/5 hover:bg-cafe/[0.01] transition-all group animate-slideInRight" style="animation-delay: ${idx * 0.05}s">
+         <div class="flex items-center px-4 md:px-8 py-4 md:py-8 bg-white border-b border-borde/5 hover:bg-cafe/[0.01] transition-all group animate-slideInRight" style="animation-delay: ${idx * 0.05}s">
             <!-- Col 1: Info Producto (flex-1) -->
-            <div class="flex-1 min-w-0 pr-12">
-               <div class="flex items-start gap-5">
-                  <div class="w-1.5 h-12 bg-caramelo rounded-full shrink-0"></div>
+            <div class="flex-1 min-w-0 pr-4 md:pr-12">
+               <div class="flex items-start gap-3 md:gap-5">
+                  <div class="w-1 md:w-1.5 h-8 md:h-12 bg-caramelo rounded-full shrink-0"></div>
                   <div>
-                    <h4 class="text-3xl font-black text-cafe uppercase tracking-tighter leading-tight">${escapeHtml(item.nombre)}</h4>
-                    <div class="flex items-center gap-4 mt-2">
-                        <span class="text-[10px] font-black text-cafe/30 uppercase tracking-[0.2em] bg-papel px-2.5 py-1 rounded-md">${item.codigo_interno || "SKU"}</span>
-                        <span class="text-[10px] font-black text-caramelo uppercase tracking-[0.1em] italic text-xs">${item.categoria || "Sin Categoría"}</span>
+                    <h4 class="text-lg md:text-3xl font-black text-cafe uppercase tracking-tighter leading-tight truncate md:whitespace-normal">${escapeHtml(item.nombre)}</h4>
+                    <div class="flex items-center gap-2 md:gap-4 mt-1 md:mt-2">
+                        <span class="text-[8px] md:text-[10px] font-black text-cafe/30 uppercase tracking-[0.2em] bg-papel px-2 py-0.5 md:py-1 rounded-md">${item.codigo_interno || "SKU"}</span>
+                        <span class="text-[8px] md:text-[10px] font-black text-caramelo uppercase tracking-[0.1em] italic text-[9px] md:text-xs">${item.categoria || "Sin Categoría"}</span>
                     </div>
                   </div>
                </div>
             </div>
             
-            <!-- Col 2: Cantidad (w-40) -->
-            <div class="w-40 flex justify-center shrink-0">
-               <div class="qty-control-wrapper shadow-lg scale-125">
+            <!-- Col 2: Cantidad (w-24 md:w-40) -->
+            <div class="w-24 md:w-40 flex justify-center shrink-0">
+               <div class="qty-control-wrapper shadow-lg scale-90 md:scale-125">
                   <button class="cart-item-qty-btn" data-action="dec" data-id="${item.id}">−</button>
-                  <span class="text-2xl font-black text-cafe w-auto min-w-[3rem] px-2 text-center select-none tracking-tighter tabular-nums">${item.quantity % 1 !== 0 ? item.quantity.toFixed(3) : item.quantity}</span>
+                  <span class="text-sm md:text-2xl font-black text-cafe w-auto min-w-[2rem] md:min-w-[3rem] px-1 md:px-2 text-center select-none tracking-tighter tabular-nums">${item.quantity % 1 !== 0 ? item.quantity.toFixed(3) : item.quantity}</span>
                   <button class="cart-item-qty-btn" data-action="inc" data-id="${item.id}">+</button>
                </div>
             </div>
 
-            <!-- Col 3: Precio Unitario (w-40) -->
-            <div class="w-40 text-right pr-10 shrink-0">
-               <p class="text-2xl font-bold text-cafe/40 tabular-nums">${formatCurrency(item.precio_venta)}</p>
-               <p class="text-[8px] font-black text-cafe/20 uppercase tracking-[0.2em] mt-1.5 opacity-60">Unit.</p>
+            <!-- Col 3: Precio Unitario (w-24 md:w-40) -->
+            <div class="w-24 md:w-40 text-right md:pr-10 shrink-0">
+               <p class="text-sm md:text-2xl font-bold text-cafe/40 tabular-nums">${formatCurrency(item.precio_venta)}</p>
+               <p class="text-[7px] md:text-[8px] font-black text-cafe/20 uppercase tracking-[0.2em] mt-1 opacity-60">Unit.</p>
             </div>
 
-            <!-- Col 4: Subtotal (w-48) -->
-            <div class="w-48 text-right pr-6 shrink-0">
-               <p class="text-5xl font-black text-cafe tracking-tighter tabular-nums leading-none">${formatCurrency(calculateItemSubtotal(item))}</p>
-               ${item.cantidad_promo > 0 && item.quantity >= item.cantidad_promo ? `<p class="text-[9px] font-bold text-verdeok uppercase tracking-widest mt-1">PROMO APLICADA</p>` : `<p class="text-[10px] font-black text-caramelo uppercase tracking-[0.2em] mt-2.5">Subtotal</p>`}
+            <!-- Col 4: Subtotal (w-32 md:w-48) -->
+            <div class="w-32 md:w-48 text-right md:pr-6 shrink-0">
+               <p class="text-2xl md:text-5xl font-black text-cafe tracking-tighter tabular-nums leading-none">${formatCurrency(calculateItemSubtotal(item))}</p>
+               ${item.cantidad_promo > 0 && item.quantity >= item.cantidad_promo ? `<p class="text-[8px] md:text-[9px] font-bold text-verdeok uppercase tracking-widest mt-1">PROMO APLICADA</p>` : `<p class="text-[8px] md:text-[10px] font-black text-caramelo uppercase tracking-[0.2em] mt-1.5 md:mt-2.5">Subtotal</p>`}
             </div>
 
-            <!-- Col 5: Eliminar (w-12) -->
-            <div class="w-12 flex justify-end shrink-0">
-               <button class="w-10 h-10 rounded-xl flex items-center justify-center bg-rojoaviso text-white shadow-md hover:bg-rojoaviso/90 active:scale-95 transition-all text-sm font-black" data-action="remove" data-id="${item.id}">✕</button>
+            <!-- Col 5: Eliminar (w-10 md:w-12) -->
+            <div class="w-10 md:w-12 flex justify-end shrink-0">
+               <button class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center bg-rojoaviso text-white shadow-md hover:bg-rojoaviso/90 active:scale-95 transition-all text-xs md:text-sm font-black" data-action="remove" data-id="${item.id}">✕</button>
             </div>
          </div>
        `,
@@ -817,12 +874,33 @@ export async function hydratePosView() {
   const confirmMixedBtn = document.querySelector("#confirm-mixed");
   const cancelMixedBtn = document.querySelector("#cancel-mixed");
 
+  const cashModal = document.querySelector("#cash-payment-modal");
+  const cashReceivedInput = document.querySelector("#cash-received");
+  const cashChangeDisplay = document.querySelector("#cash-change");
+  const cashModalTotal = document.querySelector("#cash-modal-total");
+  const confirmCashBtn = document.querySelector("#confirm-cash");
+  const cancelCashBtn = document.querySelector("#cancel-cash");
+
   // Lógica de cálculo automático para pago mixto
   mixedEfectivoInput.addEventListener("input", () => {
     const total = getCartTotal();
     const efectivo = Number(mixedEfectivoInput.value) || 0;
     const tarjeta = Math.max(0, total - efectivo);
     mixedTarjetaInput.value = tarjeta;
+  });
+
+  // Lógica de cálculo automático para pago en efectivo (vuelto)
+  cashReceivedInput.addEventListener("input", () => {
+    const total = getCartTotal();
+    const recibido = Number(cashReceivedInput.value) || 0;
+    const vuelto = Math.max(0, recibido - total);
+    cashChangeDisplay.textContent = formatCurrency(vuelto);
+  });
+
+  cashReceivedInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      confirmCashBtn.click();
+    }
   });
 
   payButton.addEventListener("click", async () => {
@@ -839,7 +917,41 @@ export async function hydratePosView() {
       return;
     }
 
+    if (selectedPaymentMethod === "Efectivo") {
+      cashModalTotal.textContent = formatCurrency(total);
+      cashReceivedInput.value = "";
+      cashChangeDisplay.textContent = formatCurrency(0);
+      cashModal.classList.remove("hidden");
+      cashReceivedInput.focus();
+      return;
+    }
+
     await processSale(total, selectedPaymentMethod);
+  });
+
+  confirmCashBtn.addEventListener("click", async () => {
+    if (isProcessingSale) return;
+    const total = getCartTotal();
+    const recibido = Number(cashReceivedInput.value) || 0;
+
+    if (recibido < total) {
+      showNotification("EL MONTO RECIBIDO ES MENOR AL TOTAL", "warning");
+      return;
+    }
+
+    cashModal.classList.add("hidden");
+    const vuelto = recibido - total;
+
+    // ABRIR GAVETA AL FINALIZAR COMPRA (EFECTIVO)
+    if (window.electronAPI?.printTicket) {
+      window.electronAPI.printTicket({ skip_print: true }).catch(() => {});
+    }
+
+    await processSale(total, "Efectivo", null, vuelto);
+  });
+
+  cancelCashBtn.addEventListener("click", () => {
+    cashModal.classList.add("hidden");
   });
 
   confirmMixedBtn.addEventListener("click", async () => {
@@ -858,6 +970,12 @@ export async function hydratePosView() {
     }
 
     mixedModal.classList.add("hidden");
+
+    // ABRIR GAVETA AL FINALIZAR COMPRA (PAGO MIXTO)
+    if (window.electronAPI?.printTicket) {
+      window.electronAPI.printTicket({ skip_print: true }).catch(() => {});
+    }
+
     await processSale(total, "Mixto", { efectivo, tarjeta });
   });
 
@@ -1031,7 +1149,7 @@ export async function hydratePosView() {
     }
   }
 
-  async function processSale(total, method, mixedData = null) {
+  async function processSale(total, method, mixedData = null, vuelto = 0) {
     if (isProcessingSale) return;
     if (cart.length === 0) return;
     if (!currentShift) {
@@ -1107,6 +1225,16 @@ export async function hydratePosView() {
       const folio = res.venta?.folio || res.data?.folio_interno || "N/A";
       document.querySelector("#modal-folio").textContent = folio;
       modalTotal.textContent = formatCurrency(total);
+
+      const changeContainer = document.querySelector("#modal-change-container");
+      const changeDisplay = document.querySelector("#modal-payment-change");
+      if (vuelto > 0) {
+        changeDisplay.textContent = formatCurrency(vuelto);
+        changeContainer.classList.remove("hidden");
+      } else {
+        changeContainer.classList.add("hidden");
+      }
+
       paymentModal.classList.remove("hidden");
 
       const paperWidth = parseInt(localStorage.getItem('paper_width') || '80', 10);
@@ -1228,6 +1356,10 @@ export async function hydratePosView() {
   updateQuickPrintToggle();
 
   await loadData();
+
+  // Limpiar intervalo previo si existe y configurar nuevo polling (cada 30 seg)
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(refreshProducts, 30000);
 }
 
 

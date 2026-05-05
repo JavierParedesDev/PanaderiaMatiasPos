@@ -8,10 +8,10 @@ export function renderProductosSkeleton() {
   const isAdmin = getSession()?.usuario?.rol === 'Admin';
 
   return `
-    <div class="px-10 py-10 space-y-8">
+    <div class="px-4 md:px-10 py-6 md:py-10 space-y-4 md:space-y-8">
       <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 class="text-3xl font-bold text-[#2d221b]">Productos</h1>
+          <h1 class="text-2xl md:text-3xl font-bold text-[#2d221b]">Productos</h1>
           <p class="text-sm text-[#705f52] mt-1">Consulta el catálogo de panadería y pastelería.</p>
         </div>
         ${isAdmin ? `
@@ -25,7 +25,7 @@ export function renderProductosSkeleton() {
         <div id="productos-progress-bar" class="h-full bg-cafe transition-all duration-300" style="width: 0%"></div>
       </div>
 
-      <div class="panel bg-white p-6">
+      <div class="panel bg-white p-4 md:p-6">
         <div class="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between font-medium">
           <div class="relative w-full md:w-96">
             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-cafe/40 text-lg">🔍</span>
@@ -178,28 +178,28 @@ function renderProductosTable(productos = []) {
       <table class="min-w-full text-sm">
         <thead class="bg-crema/30">
           <tr class="text-left text-[#6a584b] uppercase tracking-tighter text-[10px] font-black opacity-60">
-            <th class="px-4 py-4">Códigos</th>
-            <th class="px-4 py-4">Producto</th>
-            <th class="px-4 py-4">Categoría</th>
-            ${isAdmin ? '<th class="px-4 py-4">Costo</th>' : ''}
-            <th class="px-4 py-4">P. Venta</th>
-            ${isAdmin ? '<th class="px-4 py-4 text-center">Margen</th>' : ''}
-            <th class="px-4 py-4 text-center">⚖️ Pesable</th>
-            <th class="px-4 py-4 text-center">Activo</th>
-            ${isAdmin ? '<th class="px-4 py-4 text-right">Acciones</th>' : ''}
+            <th class="px-2 md:px-4 py-4">Códigos</th>
+            <th class="px-2 md:px-4 py-4">Producto</th>
+            <th class="px-2 md:px-4 py-4">Categoría</th>
+            ${isAdmin ? '<th class="px-2 md:px-4 py-4">Costo</th>' : ''}
+            <th class="px-2 md:px-4 py-4">P. Venta</th>
+            ${isAdmin ? '<th class="px-2 md:px-4 py-4 text-center">Margen</th>' : ''}
+            <th class="px-2 md:px-4 py-4 text-center">⚖️ Pesable</th>
+            <th class="px-2 md:px-4 py-4 text-center">Activo</th>
+            ${isAdmin ? '<th class="px-2 md:px-4 py-4 text-right">Acciones</th>' : ''}
           </tr>
         </thead>
         <tbody class="divide-y divide-borde/20">
           ${productos.map((producto) => `
             <tr class="hover:bg-crema/10 transition-colors ${!producto.activo ? 'opacity-50 grayscale-[0.5]' : ''}">
-              <td class="px-4 py-4">
-                <p class="font-mono text-[11px] text-cafe">IN: ${escapeHtml(producto.codigo_interno || '-')}</p>
-                <p class="font-mono text-[10px] text-cafe/40">EX: ${escapeHtml(producto.codigo_barra_externo || '-')}</p>
+              <td class="px-2 md:px-4 py-4">
+                <p class="font-mono text-[10px] md:text-[11px] text-cafe">IN: ${escapeHtml(producto.codigo_interno || '-')}</p>
+                <p class="font-mono text-[9px] md:text-[10px] text-cafe/40">EX: ${escapeHtml(producto.codigo_barra_externo || '-')}</p>
               </td>
-              <td class="px-4 py-4 font-bold text-[#2d221b]">${escapeHtml(producto.nombre)}</td>
-              <td class="px-4 py-4 text-xs text-cafe/70">${escapeHtml(producto.categoria || '-')}</td>
-              ${isAdmin ? `<td class="px-4 py-4 text-cafe/60 font-medium">${formatCurrency(producto.precio_costo)}</td>` : ''}
-              <td class="px-4 py-4 font-black text-cafe">${formatCurrency(producto.precio_venta)}</td>
+              <td class="px-2 md:px-4 py-4 font-bold text-[#2d221b] text-xs md:text-sm">${escapeHtml(producto.nombre)}</td>
+              <td class="px-2 md:px-4 py-4 text-[10px] md:text-xs text-cafe/70">${escapeHtml(producto.categoria || '-')}</td>
+              ${isAdmin ? `<td class="px-2 md:px-4 py-4 text-cafe/60 font-medium text-xs md:text-sm">${formatCurrency(producto.precio_costo)}</td>` : ''}
+              <td class="px-2 md:px-4 py-4 font-black text-cafe text-xs md:text-sm">${formatCurrency(producto.precio_venta)}</td>
               ${isAdmin ? `
               <td class="px-4 py-4 text-center">
                 <span class="badge ${producto.margen_porcentaje > 30 ? 'bg-verdeok/10 text-verdeok' : 'bg-caramelo/10 text-caramelo'}">

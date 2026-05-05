@@ -1,6 +1,6 @@
 provider: github
 owner: JavierParedesDev
-repo: PanaderiaMatiasPos
+repo: ActualizacionPanaderiaMati
 vfs: true
 channel: cajero
 updaterCacheDirName: panaderia-matias-updater
