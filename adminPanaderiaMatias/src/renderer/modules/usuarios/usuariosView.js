@@ -1,5 +1,4 @@
-import { getUsuarios, crearUsuario, actualizarUsuario, eliminarUsuario } from '../../services/userService.js';
-import { checkUpdates } from '../../services/updaterService.js';
+﻿import { getUsuarios, crearUsuario, actualizarUsuario, eliminarUsuario } from '../../services/userService.js';
 import { escapeHtml } from '../../utils/formatters.js';
 
 export function renderUsuariosSkeleton() {
@@ -37,9 +36,9 @@ export function renderUsuariosSkeleton() {
 
           <div class="panel p-6 bg-white shadow-sm">
              <h3 class="text-sm font-black text-cafe/40 uppercase tracking-widest mb-4">Soporte Tecnológico</h3>
-             <p class="text-xs text-cafe/60 leading-relaxed">Para soporte técnico o errores críticos, contacte al desarrollador mediante el repositorio oficial.</p>
+             <p class="text-xs text-cafe/60 leading-relaxed">Para soporte tecnico, errores criticos o asistencia del sistema, contacte a Punto Digital Hualpen.</p>
              <div class="mt-4 p-3 bg-papel/20 rounded-lg text-[10px] font-mono text-cafe/40 break-all border border-borde/20">
-               github.com/JavierParedesDev
+               www.puntodigitalhualpen.com
              </div>
           </div>
         </aside>
@@ -213,7 +212,6 @@ export async function hydrateUsuariosView() {
 
   await loadUsers();
 
-  // Lógica de actualizaciones
   const btnCheck = document.querySelector('#btn-check-updates');
   const statusEl = document.querySelector('#updater-status');
 
@@ -222,17 +220,21 @@ export async function hydrateUsuariosView() {
     btnCheck.innerText = 'Buscando...';
 
     try {
-      const update = await checkUpdates();
-      if (update.hasUpdate) {
-        statusEl.innerHTML = `
-          <div class="p-4 bg-azulaviso/10 border border-azulaviso/20 rounded-2xl mb-4">
-            <p class="text-xs font-black text-azulaviso">¡Nueva versión disponible!</p>
-            <p class="text-[10px] text-cafe/60 font-bold mt-1">Versión detectada: v${update.latest}</p>
-            <a href="${update.url}" target="_blank" class="block mt-3 py-2 bg-azulaviso text-white text-center rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md">Descargar Actualización</a>
-          </div>
-        `;
+      if (!window.electronAPI?.checkForUpdates) {
+        throw new Error('El actualizador no esta disponible en esta ventana.');
+      }
+
+      const res = await window.electronAPI.checkForUpdates();
+      if (res.success) {
+        if (res.updateInfo) {
+          btnCheck.innerText = 'Descargando...';
+        } else {
+          alert('El sistema ya cuenta con la ultima version disponible.');
+          btnCheck.disabled = false;
+          btnCheck.innerText = 'Buscar Actualizaciones';
+        }
       } else {
-        alert('El sistema ya cuenta con la última versión disponible (v1.0.0).');
+        alert('Error: ' + (res.error || 'No se pudo buscar actualizaciones.'));
         btnCheck.disabled = false;
         btnCheck.innerText = 'Buscar Actualizaciones';
       }
@@ -241,5 +243,49 @@ export async function hydrateUsuariosView() {
       btnCheck.disabled = false;
       btnCheck.innerText = 'Buscar Actualizaciones';
     }
+  });
+
+  window.electronAPI?.onUpdateAvailable?.((info) => {
+    statusEl.innerHTML = `
+      <div class="p-4 bg-azulaviso/10 border border-azulaviso/20 rounded-2xl mb-4">
+        <p class="text-xs font-black text-azulaviso">Nueva version disponible</p>
+        <p class="text-[10px] text-cafe/60 font-bold mt-1">Version detectada: v${info?.version || 'nueva'}</p>
+        <div id="update-progress-container" class="mt-4">
+          <div class="flex justify-between mb-2">
+            <span id="update-status-text" class="text-[10px] font-black text-cafe/60 uppercase tracking-widest">Descargando actualizacion...</span>
+            <span id="update-percent-text" class="text-[10px] font-black text-cafe italic">0%</span>
+          </div>
+          <div class="h-2 w-full bg-papel rounded-full overflow-hidden border border-borde/20">
+            <div id="update-progress-bar" class="h-full bg-caramelo transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  window.electronAPI?.onUpdateProgress?.((progress) => {
+    const percent = Math.round(progress?.percent || 0);
+    const progressBar = document.querySelector('#update-progress-bar');
+    const percentText = document.querySelector('#update-percent-text');
+    const statusText = document.querySelector('#update-status-text');
+
+    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (percentText) percentText.innerText = `${percent}%`;
+    if (statusText) statusText.innerText = 'Descargando actualizacion...';
+  });
+
+  window.electronAPI?.onUpdateDownloaded?.((info) => {
+    statusEl.innerHTML = `
+      <div class="p-4 bg-verdeok/10 border border-verdeok/20 rounded-2xl">
+        <p class="text-xs font-black text-verdeok">Actualizacion lista</p>
+        <p class="text-[10px] text-cafe/60 font-bold mt-1">Version v${info?.version || 'nueva'} descargada. Se instalara automaticamente al cerrar y abrir la app.</p>
+      </div>
+    `;
+  });
+
+  window.electronAPI?.onUpdateError?.((error) => {
+    alert('Error al actualizar: ' + error);
+    btnCheck.disabled = false;
+    btnCheck.innerText = 'Buscar Actualizaciones';
   });
 }

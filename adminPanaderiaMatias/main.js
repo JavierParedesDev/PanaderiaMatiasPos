@@ -2,9 +2,13 @@ const path = require('path');
 const net = require('net');
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 
 const DEFAULT_SCALE_TIMEOUT_MS = 8000;
 const appIconPath = path.join(__dirname, 'assets', 'icon.ico');
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 function toPayloadBuffer(payload) {
   if (typeof payload === 'string') {
@@ -121,10 +125,28 @@ function createWindow() {
     backgroundColor: '#f3efe6',
     icon: appIconPath,
     show: false,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      devTools: true
+    }
+  });
+
+  mainWindow.setMenu(null);
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const key = String(input.key || '').toLowerCase();
+
+    if ((input.control && input.shift && key === 'i') || input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+
+    if ((input.control && key === 'r') || input.key === 'F5') {
+      mainWindow.webContents.reload();
+      event.preventDefault();
     }
   });
 
@@ -145,25 +167,40 @@ try {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.panaderiamatias.admin');
 
-const { autoUpdater } = require('electron-updater');
+  ipcMain.handle('check-for-updates', async () => {
+    try {
+      const result = await autoUpdater.checkForUpdatesAndNotify();
+      return {
+        success: true,
+        updateInfo: result ? result.updateInfo : null
+      };
+    } catch (error) {
+      console.error("Error checking for updates:", error);
+      return { success: false, error: error.message };
+    }
+  });
 
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-available', (info) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.webContents.send('update-available', info);
+  });
 
-ipcMain.handle('check-for-updates', async () => {
-  try {
-    const result = await autoUpdater.checkForUpdatesAndNotify();
-    return { 
-      success: true, 
-      updateInfo: result ? result.updateInfo : null 
-    };
-  } catch (error) {
-    console.error("Error checking for updates:", error);
-    return { success: false, error: error.message };
-  }
-});
+  autoUpdater.on('download-progress', (progressObj) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.webContents.send('update-progress', progressObj);
+  });
 
-ipcMain.handle('scale:send-plu', async (_event, payload) => sendScalePayload(payload));
+  autoUpdater.on('update-downloaded', (info) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.webContents.send('update-downloaded', info);
+  });
+
+  autoUpdater.on('error', (err) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.webContents.send('update-error', err.message);
+  });
+
+  ipcMain.handle('scale:send-plu', async (_event, payload) => sendScalePayload(payload));
 
   createWindow();
 

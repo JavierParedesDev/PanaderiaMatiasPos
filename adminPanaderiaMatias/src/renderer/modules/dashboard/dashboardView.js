@@ -39,7 +39,7 @@ export async function hydrateDashboardView() {
     try {
       const response = await getDashboard();
       const data = response.data;
-  const { kpis, alertasStock, ultimasVentas, graficoVentas, graficoMensual } = data;
+      const { kpis, ultimasVentas, graficoVentas, graficoMensual } = data;
 
     // Generar gráfico SVG simple
   const maxVenta = Math.max(...graficoVentas.map(d => d.total), 100000);
@@ -149,29 +149,7 @@ export async function hydrateDashboardView() {
         </div>
       </section>
 
-  <div class="grid gap-6 md:grid-cols-2">
-        <!-- Alertas de Stock -->
-        <section class="panel p-6 bg-white">
-          <div class="flex items-center justify-between mb-6 border-b border-borde/30 pb-4">
-            <h2 class="text-lg font-black text-[#2d221b]">Alertas de Stock</h2>
-            <span class="badge bg-rojoaviso/10 text-rojoaviso text-[10px] font-black">${alertasStock.total} CRÍTICOS</span>
-          </div>
-          <div class="space-y-3">
-            ${alertasStock.items.length ? alertasStock.items.map(item => `
-              <div class="flex items-center justify-between p-3 rounded-xl bg-papel/50 border border-borde/20">
-                <div>
-                  <p class="text-sm font-bold text-[#2d221b]">${escapeHtml(item.nombre)}</p>
-                  <p class="text-[10px] text-cafe/50 uppercase font-bold">Mínimo: ${item.stock_minimo} ${escapeHtml(item.unidad)}</p>
-                </div>
-                <div class="text-right">
-                  <p class="text-sm font-black text-rojoaviso">${item.stock_actual}</p>
-                  <p class="text-[10px] text-rojoaviso font-bold uppercase">En stock</p>
-                </div>
-              </div>
-            `).join('') : '<p class="text-sm text-verdeok italic text-center py-6 font-bold">✅ Todos los niveles están normales.</p>'}
-          </div>
-        </section>
-
+  <div class="grid gap-6">
         <!-- Últimos Movimientos -->
         <section class="panel p-6 bg-white">
           <div class="flex items-center justify-between mb-6 border-b border-borde/30 pb-4">

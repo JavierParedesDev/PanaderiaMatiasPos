@@ -1,6 +1,6 @@
 {
   "name": "adminpanaderiamatias",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Panel de administración interno de Panadería Matías.",
   "main": "main.js",
   "repository": {
@@ -39,6 +39,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "admin.yml",
       "src/**/*",
       "assets/**/*",
       "node_modules/**/*",

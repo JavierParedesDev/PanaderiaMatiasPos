@@ -19,7 +19,7 @@ export function renderInventarioSkeleton() {
         <div>
           <p class="text-sm uppercase tracking-[0.28em] text-cafe/60">Stock por sucursal</p>
           <h1 class="mt-2 text-3xl font-bold text-[#2d221b]">Inventario</h1>
-          <p class="mt-2 text-sm text-[#705f52]">Lista simple de productos con su stock actual.</p>
+          <p class="mt-2 text-sm text-[#705f52]">Lista simple de productos con su stock actual y minimo critico.</p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
           <select id="inventario-sucursal" class="field min-w-[220px]">
@@ -70,6 +70,12 @@ export function renderInventarioSkeleton() {
             <div>
               <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Nuevo stock</label>
               <input id="inventario-stock-input" type="number" step="0.01" min="0" class="field" placeholder="0">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-cafe/60 mb-2">Stock minimo critico</label>
+              <input id="inventario-stock-minimo-input" type="number" step="0.01" min="0" class="field" placeholder="0">
+              <p class="mt-1 text-[10px] text-cafe/40">Se marcara como critico cuando el stock actual sea igual o menor a este valor.</p>
             </div>
 
             <div>
@@ -145,12 +151,15 @@ function renderInventarioTable(items = []) {
             <th class="px-3 py-3">Producto</th>
             <th class="px-3 py-3">Unidad</th>
             <th class="px-3 py-3 text-right">Stock</th>
+            <th class="px-3 py-3 text-right">Minimo</th>
             <th class="px-3 py-3 text-right">Accion</th>
           </tr>
         </thead>
         <tbody>
           ${items.map((item) => {
-            const critical = Number(item.stock_actual) <= Number(item.stock_minimo || 0);
+            const stockActual = Number(item.stock_actual ?? 0);
+            const stockMinimo = Number(item.stock_minimo ?? 0);
+            const critical = stockMinimo > 0 && stockActual <= stockMinimo;
 
             return `
               <tr class="border-t border-borde/60 hover:bg-crema/20">
@@ -160,6 +169,7 @@ function renderInventarioTable(items = []) {
                 </td>
                 <td class="px-3 py-3">${escapeHtml(item.unidad || '-')}</td>
                 <td class="px-3 py-3 text-right font-black ${critical ? 'text-rojoaviso' : 'text-[#2d221b]'}">${escapeHtml(item.stock_actual)}</td>
+                <td class="px-3 py-3 text-right font-bold ${critical ? 'text-rojoaviso' : 'text-cafe/50'}">${escapeHtml(item.stock_minimo ?? 0)}</td>
                 <td class="px-3 py-3 text-right">
                   <button class="btn-secondary px-3 py-2 text-xs" data-ajustar-stock="${escapeHtml(item.id)}">Ajustar stock</button>
                 </td>
@@ -195,12 +205,14 @@ function openModal(product) {
   const productLabel = document.querySelector('#inventario-modal-producto');
   const stockLabel = document.querySelector('#inventario-stock-actual-label');
   const stockInput = document.querySelector('#inventario-stock-input');
+  const stockMinimoInput = document.querySelector('#inventario-stock-minimo-input');
   const observacionInput = document.querySelector('#inventario-stock-observacion');
   const modalMessage = document.querySelector('#inventario-modal-message');
 
   if (productLabel) productLabel.textContent = `${product.codigo_interno || 'SIN CODIGO'} - ${product.nombre}`;
   if (stockLabel) stockLabel.textContent = String(product.stock_actual ?? 0);
   if (stockInput) stockInput.value = product.stock_actual ?? 0;
+  if (stockMinimoInput) stockMinimoInput.value = product.stock_minimo ?? 0;
   if (observacionInput) observacionInput.value = '';
   if (modalMessage) modalMessage.classList.add('hidden');
 
@@ -329,11 +341,13 @@ export async function hydrateInventarioView() {
 
     try {
       const stockActual = Number(document.querySelector('#inventario-stock-input')?.value || 0);
+      const stockMinimo = Number(document.querySelector('#inventario-stock-minimo-input')?.value || 0);
       const observacion = document.querySelector('#inventario-stock-observacion')?.value?.trim() || 'Ajuste manual de stock';
 
       const response = await fijarInventario(selectedProduct.id, {
         id_sucursal: currentSucursalId,
         stock_actual: stockActual,
+        stock_minimo: stockMinimo,
         observacion
       });
 

@@ -12,14 +12,37 @@ except ImportError:
 
 def format_currency(value):
     try:
-        return f"${int(value):,}".replace(",", ".")
-    except:
+        return f"${int(round(parse_amount(value))):,}".replace(",", ".")
+    except Exception:
         return f"${value}"
+
+def parse_amount(value, default=0):
+    try:
+        if isinstance(value, str):
+            raw_value = value.strip().replace("$", "").replace(" ", "")
+            if "." in raw_value and "," not in raw_value:
+                parts = raw_value.split(".")
+                if len(parts[-1]) == 3 and all(part.isdigit() for part in parts):
+                    raw_value = "".join(parts)
+            raw_value = raw_value.replace(",", ".")
+            return float(raw_value)
+        return float(value)
+    except Exception:
+        return default
 
 def truncate(text, max_len):
     return str(text)[:max_len]
 
 def rjust_line(left, right, width):
+    left = str(left)
+    right = str(right)
+    if len(right) >= width:
+        return right[-width:]
+
+    max_left = width - len(right) - 1
+    if len(left) > max_left:
+        left = left[:max_left]
+
     gap = width - len(left) - len(right)
     if gap < 1:
         gap = 1
@@ -52,11 +75,11 @@ def resolve_cols(paper_mm):
     Conservador para evitar desbordamiento en impresoras pequeñas.
     """
     if paper_mm <= 52:
-        return 22, 14    # 50mm
+        return 20, 12    # 50mm
     elif paper_mm <= 62:
-        return 32, 22    # 58mm
+        return 30, 20    # 58mm
     else:
-        return 48, 32    # 80mm
+        return 42, 28    # 80mm conservador para no cortar importes
 
 def print_ticket(data):
     try:
@@ -269,19 +292,18 @@ def print_ticket(data):
             nombre = truncate(item.get("nombre", ""), NAME_MAX).upper()
             try:
                 cantidad = float(item.get("cantidad", 0))
-                precio_u = float(item.get("precio_unitario", 0))
-            except:
+            except Exception:
                 cantidad = 0
-                precio_u = 0
+            precio_u = parse_amount(item.get("precio_unitario", 0))
 
-            subtotal = cantidad * precio_u
+            subtotal = parse_amount(item.get("subtotal"), cantidad * precio_u)
             cant_str = (
                 f"{cantidad:.3f}".rstrip("0").rstrip(".")
                 if cantidad % 1 != 0
                 else str(int(cantidad))
             )
 
-            if COLS <= 32:
+            if COLS <= 42:
                 # Formato compacto: 2 líneas por producto
                 p.text(f"{nombre}\n")
                 detail = f"  {cant_str}x{format_currency(precio_u)}"
@@ -298,16 +320,16 @@ def print_ticket(data):
         p.text(SEP + "\n")
 
         # ── Total ──────────────────────────────────────────────────────────────
-        total = float(data.get("total", 0))
-        p.set(align="right", font="a", bold=True, double_height=False, double_width=False)
-        p.text(f"TOTAL {format_currency(total)}\n")
+        total = parse_amount(data.get("total", 0))
+        p.set(align="left", font="a", bold=True, double_height=False, double_width=False)
+        p.text(rjust_line("TOTAL", format_currency(total), COLS) + "\n")
 
-        p.set(align="right", font="a", bold=False, double_height=False, double_width=False)
+        p.set(align="left", font="a", bold=False, double_height=False, double_width=False)
 
         # ── Vuelto ─────────────────────────────────────────────────────────────
         vuelto = data.get("vuelto")
-        if vuelto is not None and float(vuelto) > 0:
-            p.text(f"Vuelto: {format_currency(vuelto)}\n")
+        if vuelto is not None and parse_amount(vuelto) > 0:
+            p.text(rjust_line("Vuelto:", format_currency(vuelto), COLS) + "\n")
 
         # ── Footer ─────────────────────────────────────────────────────────────
         p.set(align="center", font="a", bold=False, double_height=False, double_width=False)

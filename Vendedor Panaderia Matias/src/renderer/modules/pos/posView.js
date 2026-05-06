@@ -1250,6 +1250,7 @@ export async function hydratePosView() {
           nombre: i.nombre,
           cantidad: i.quantity,
           precio_unitario: i.precio_venta || 0,
+          subtotal: (i.precio_venta || 0) * i.quantity,
         }))
       };
 
@@ -1361,5 +1362,4 @@ export async function hydratePosView() {
   if (refreshInterval) clearInterval(refreshInterval);
   refreshInterval = setInterval(refreshProducts, 30000);
 }
-
 

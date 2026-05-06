@@ -139,11 +139,17 @@ const getDashboard = async (req, res) => {
         );
         const stockCritico = await pool.query(
             `
-            SELECT p.nombre, i.stock_actual, i.stock_minimo, p.unidad
-            FROM inventarios i
-            JOIN productos p ON i.id_producto = p.id
-            WHERE i.id_sucursal = $1 AND i.stock_actual <= i.stock_minimo
-            ORDER BY i.stock_actual ASC, p.nombre ASC
+            SELECT
+                p.nombre,
+                COALESCE(i.stock_actual, 0) as stock_actual,
+                COALESCE(i.stock_minimo, 0) as stock_minimo,
+                p.unidad
+            FROM productos p
+            LEFT JOIN inventarios i ON i.id_producto = p.id AND i.id_sucursal = $1
+            WHERE p.activo = TRUE
+              AND COALESCE(i.stock_minimo, 0) > 0
+              AND COALESCE(i.stock_actual, 0) <= COALESCE(i.stock_minimo, 0)
+            ORDER BY COALESCE(i.stock_actual, 0) ASC, p.nombre ASC
             LIMIT 5
         `,
             [id_sucursal]
@@ -151,8 +157,11 @@ const getDashboard = async (req, res) => {
         const stockCriticoCount = await pool.query(
             `
             SELECT COUNT(*) as cantidad
-            FROM inventarios
-            WHERE id_sucursal = $1 AND stock_actual <= stock_minimo
+            FROM productos p
+            LEFT JOIN inventarios i ON i.id_producto = p.id AND i.id_sucursal = $1
+            WHERE p.activo = TRUE
+              AND COALESCE(i.stock_minimo, 0) > 0
+              AND COALESCE(i.stock_actual, 0) <= COALESCE(i.stock_minimo, 0)
         `,
             [id_sucursal]
         );
